@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336" fill="none">
+  <rect width="240" height="336" rx="14" fill="#101013"/>
+  <rect x="8" y="8" width="224" height="320" rx="10" fill="#18181d" stroke="#c9a24b" stroke-width="1.8"/>
+  <rect x="16" y="16" width="208" height="304" rx="6" stroke="#c9a24b" stroke-opacity="0.35" stroke-width="1"/>
+  <!-- Guilloche overlapping rings -->
+  <g stroke="#c9a24b" stroke-opacity="0.28" stroke-width="1">
+    <circle cx="120" cy="108" r="56"/>
+    <circle cx="120" cy="138" r="56"/>
+    <circle cx="120" cy="168" r="56"/>
+    <circle cx="120" cy="198" r="56"/>
+    <circle cx="120" cy="228" r="56"/>
+    <circle cx="94" cy="168" r="56"/>
+    <circle cx="146" cy="168" r="56"/>
+  </g>
+  <circle cx="120" cy="168" r="34" fill="#101013" stroke="#e8cf8f" stroke-width="1.6"/>
+  <path d="M120 142 L142 168 L120 194 L98 168 Z" stroke="#e8cf8f" stroke-width="1.6"/>
+  <circle cx="120" cy="168" r="5" fill="#c9a24b"/>
+</svg>
+

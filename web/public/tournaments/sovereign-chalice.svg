@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" fill="none">
+  <defs>
+    <radialGradient id="chaliceBg" cx="50%" cy="48%" r="58%">
+      <stop offset="0%" stop-color="#821a2e" stop-opacity="0.5"/>
+      <stop offset="65%" stop-color="#1e1e23" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#101013"/>
+    </radialGradient>
+    <linearGradient id="chaliceGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2ebdd"/>
+      <stop offset="35%" stop-color="#d9b863"/>
+      <stop offset="75%" stop-color="#c9a24b"/>
+      <stop offset="100%" stop-color="#7c5b1a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="420" rx="12" fill="url(#chaliceBg)"/>
+  <rect x="14" y="14" width="612" height="392" rx="8" stroke="#c9a24b" stroke-opacity="0.4" stroke-width="1.2"/>
+  <rect x="22" y="22" width="596" height="376" rx="6" stroke="#c9a24b" stroke-opacity="0.18" stroke-width="1"/>
+
+  <circle cx="320" cy="196" r="146" stroke="#c9a24b" stroke-opacity="0.2" stroke-width="1" stroke-dasharray="3 6"/>
+
+  <!-- Handles -->
+  <path d="M232 108 C176 108 172 192 246 208" stroke="url(#chaliceGold)" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M408 108 C464 108 468 192 394 208" stroke="url(#chaliceGold)" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- Cup Bowl -->
+  <path d="M224 84 H416 C412 186 372 232 320 236 C268 232 228 186 224 84 Z" fill="url(#chaliceGold)" stroke="#f2ebdd" stroke-width="1.5"/>
+  <ellipse cx="320" cy="84" rx="96" ry="14" fill="#2a151b" stroke="#e8cf8f" stroke-width="2.5"/>
+
+  <!-- Burgundy Enamel Crest on Cup -->
+  <path d="M320 118 L348 152 L320 186 L292 152 Z" fill="#6b1424" stroke="#f2ebdd" stroke-width="2"/>
+  <path d="M320 132 L334 152 L320 172 L306 152 Z" fill="#e8cf8f"/>
+
+  <!-- Stem -->
+  <rect x="306" y="236" width="28" height="62" rx="6" fill="url(#chaliceGold)"/>
+  <ellipse cx="320" cy="266" rx="26" ry="9" fill="#6b1424" stroke="#e8cf8f" stroke-width="1.8"/>
+
+  <!-- Pedestal Base -->
+  <path d="M260 298 H380 L398 326 H242 Z" fill="url(#chaliceGold)"/>
+  <rect x="228" y="326" width="184" height="34" rx="5" fill="#16161a" stroke="url(#chaliceGold)" stroke-width="2.5"/>
+  <rect x="262" y="336" width="116" height="14" rx="2" fill="#6b1424" stroke="#c9a24b" stroke-width="1"/>
+</svg>
+

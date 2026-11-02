@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336" fill="none">
+  <defs>
+    <radialGradient id="burgBg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#821a2e"/>
+      <stop offset="70%" stop-color="#58101e"/>
+      <stop offset="100%" stop-color="#2e0810"/>
+    </radialGradient>
+  </defs>
+  <rect width="240" height="336" rx="14" fill="#16161a"/>
+  <rect x="7" y="7" width="226" height="322" rx="10" fill="url(#burgBg)" stroke="#d9b863" stroke-width="2"/>
+  <rect x="15" y="15" width="210" height="306" rx="6" stroke="#e8cf8f" stroke-opacity="0.5" stroke-width="1"/>
+  <!-- Corner filigree -->
+  <path d="M22 38 V22 H38 M218 38 V22 H202 M22 298 V314 H38 M218 298 V314 H202" stroke="#e8cf8f" stroke-width="2" stroke-linecap="round"/>
+  <!-- Center medallion -->
+  <circle cx="120" cy="168" r="54" stroke="#d9b863" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <circle cx="120" cy="168" r="42" fill="#3d0b15" stroke="#e8cf8f" stroke-width="1.8"/>
+  <path d="M120 134 L150 168 L120 202 L90 168 Z" fill="#6b1424" stroke="#e8cf8f" stroke-width="1.5"/>
+  <circle cx="120" cy="168" r="8" fill="#e8cf8f"/>
+</svg>
+

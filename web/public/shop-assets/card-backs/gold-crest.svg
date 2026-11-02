@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336" fill="none">
+  <defs>
+    <linearGradient id="crestGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2ebdd"/>
+      <stop offset="50%" stop-color="#d9b863"/>
+      <stop offset="100%" stop-color="#8a6823"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="336" rx="14" fill="#14090c"/>
+  <rect x="7" y="7" width="226" height="322" rx="10" fill="#4f0f1c" stroke="url(#crestGold)" stroke-width="2.4"/>
+  <rect x="15" y="15" width="210" height="306" rx="6" stroke="#e8cf8f" stroke-opacity="0.6" stroke-width="1.2"/>
+  <!-- Outer octagonal frame -->
+  <polygon points="80,32 160,32 204,76 204,260 160,304 80,304 36,260 36,76" stroke="url(#crestGold)" stroke-width="1.4" fill="#2c0810" fill-opacity="0.55"/>
+  <!-- Embossed shield crest -->
+  <path d="M120 96 L168 116 V170 C168 206 146 230 120 242 C94 230 72 206 72 170 V116 Z" fill="url(#crestGold)" stroke="#f2ebdd" stroke-width="1.5"/>
+  <path d="M120 110 L154 125 V168 C154 196 138 214 120 224 C102 214 86 196 86 168 V125 Z" fill="#6b1424"/>
+  <path d="M120 132 L140 168 L120 204 L100 168 Z" fill="url(#crestGold)"/>
+</svg>
+

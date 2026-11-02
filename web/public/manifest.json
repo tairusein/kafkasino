@@ -1,0 +1,28 @@
+{
+  "name": "Kafkasino — Private Club & Grand Salon",
+  "short_name": "Kafkasino",
+  "description": "Strict, classic multiplayer board and casino salon featuring Texas Hold'em Poker, Blackjack, 36-Card Durak, European Roulette, Vintage Slots, Chess, and Checkers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#16161A",
+  "theme_color": "#16161A",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

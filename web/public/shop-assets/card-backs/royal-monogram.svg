@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336" fill="none">
+  <defs>
+    <linearGradient id="royalGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2ebdd"/>
+      <stop offset="45%" stop-color="#e8cf8f"/>
+      <stop offset="100%" stop-color="#9e7828"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="336" rx="14" fill="#120d10"/>
+  <rect x="7" y="7" width="226" height="322" rx="10" fill="#1d1419" stroke="url(#royalGold)" stroke-width="2.5"/>
+  <rect x="15" y="15" width="210" height="306" rx="6" stroke="url(#royalGold)" stroke-opacity="0.55" stroke-width="1.2"/>
+  <!-- Corner diamonds -->
+  <path d="M32 26 L38 34 L32 42 L26 34 Z M208 26 L214 34 L208 42 L202 34 Z M32 294 L38 302 L32 310 L26 302 Z M208 294 L214 302 L208 310 L202 302 Z" fill="url(#royalGold)"/>
+  <!-- Sunburst rays -->
+  <circle cx="120" cy="168" r="74" stroke="url(#royalGold)" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="2 5"/>
+  <circle cx="120" cy="168" r="58" fill="#4a101d" stroke="url(#royalGold)" stroke-width="2.2"/>
+  <circle cx="120" cy="168" r="50" stroke="#f2ebdd" stroke-opacity="0.45" stroke-width="1"/>
+  <!-- Hand-set K Monogram -->
+  <path d="M104 142 V194 M104 168 L134 142 M114 160 L136 194" stroke="url(#royalGold)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+

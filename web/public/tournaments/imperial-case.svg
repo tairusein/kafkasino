@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" fill="none">
+  <defs>
+    <radialGradient id="caseBg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#6b1424" stop-opacity="0.5"/>
+      <stop offset="68%" stop-color="#1e1e23" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#101013"/>
+    </radialGradient>
+    <linearGradient id="barGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2ebdd"/>
+      <stop offset="45%" stop-color="#d9b863"/>
+      <stop offset="100%" stop-color="#8a6823"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="420" rx="12" fill="url(#caseBg)"/>
+  <rect x="14" y="14" width="612" height="392" rx="8" stroke="#c9a24b" stroke-opacity="0.4" stroke-width="1.2"/>
+  <rect x="22" y="22" width="596" height="376" rx="6" stroke="#c9a24b" stroke-opacity="0.18" stroke-width="1"/>
+
+  <!-- Case Handle -->
+  <path d="M268 106 V82 C268 72 276 66 286 66 H354 C364 66 372 72 372 82 V106" stroke="url(#barGold)" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Attache Case Outer Body -->
+  <rect x="136" y="104" width="368" height="236" rx="14" fill="#191316" stroke="url(#barGold)" stroke-width="3"/>
+  <rect x="152" y="120" width="336" height="204" rx="8" fill="#47101b" stroke="#c9a24b" stroke-opacity="0.5" stroke-width="1.5"/>
+
+  <!-- Gold Bullion Bars Inside -->
+  <g fill="url(#barGold)" stroke="#16161a" stroke-width="1.5">
+    <rect x="176" y="146" width="84" height="42" rx="5"/>
+    <rect x="278" y="146" width="84" height="42" rx="5"/>
+    <rect x="380" y="146" width="84" height="42" rx="5"/>
+  </g>
+
+  <!-- High-Denomination House Plaques & Chips -->
+  <g>
+    <circle cx="218" cy="254" r="36" fill="#6b1424" stroke="#e8cf8f" stroke-width="3"/>
+    <circle cx="218" cy="254" r="24" stroke="#e8cf8f" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <circle cx="320" cy="254" r="40" fill="#16161a" stroke="#e8cf8f" stroke-width="3"/>
+    <path d="M320 232 L336 254 L320 276 L304 254 Z" fill="#c9a24b"/>
+    <circle cx="422" cy="254" r="36" fill="#6b1424" stroke="#e8cf8f" stroke-width="3"/>
+    <circle cx="422" cy="254" r="24" stroke="#e8cf8f" stroke-width="1.5" stroke-dasharray="4 4"/>
+  </g>
+</svg>
+
