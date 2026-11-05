@@ -1,443 +1,335 @@
 import { useEffect, useState } from 'react';
-import { useSound } from '../audio/SoundProvider';
 import { useI18n } from '../i18n/I18nProvider';
 import { formatChips } from '../lib/format';
 import { DEFAULT_CARD_BACK_URL, EMOTE_SPECS, resolveCardBackUrl } from '../lib/shop';
 import type {
-  Card,
   GameStateRow,
   InteractiveEmoteEvent,
-  PokerSeatState,
+  PlayingCard,
+  PokerPlayerState,
   QuickEmoteEvent,
-  Room,
   RoomSeatWithProfile,
   ShopItem,
 } from '../lib/types';
-import { useWallet } from '../wallet/WalletProvider';
 import { Avatar } from './Avatar';
 import { EmoteVectorIcon } from './InteractiveEmotePreview';
 import { CasinoChipSvg, PlayingCardSvg } from './PlayingCardSvg';
 
-const RAISE_CHIPS = [50, 100, 250, 500, 1000] as const;
+const CHIP_DENOMS = [50, 100, 500, 1000, 5000] as const;
 
 interface PokerTableProps {
-  room: Room;
+  myUserId: string;
+  minBet: number;
+  walletBalance: number | null;
   seats: RoomSeatWithProfile[];
-  currentUserId: string | null;
   gameState: GameStateRow | null;
-  myPrivateCards: Card[];
+  privateState: Record<string, unknown>;
   cardBackMap: Map<string, ShopItem>;
+  turnRemainingMs: number | null;
   quickEmotesByUser: Record<string, QuickEmoteEvent>;
   activeInteractiveEmote: InteractiveEmoteEvent | null;
-  turnRemainingMs: number | null;
-  actionBusy: boolean;
-  onStartHand: () => Promise<void>;
-  onAction: (action: 'fold' | 'check' | 'call' | 'raise' | 'all_in', raiseTo?: number) => Promise<void>;
   onFireInteractive: (targetUserId: string) => Promise<void>;
+  onStartHand: () => Promise<void>;
+  onAction: (action: 'fold' | 'check' | 'call' | 'raise', amount?: number) => Promise<void>;
 }
 
 export function PokerTable({
-  room,
+  myUserId,
+  minBet,
+  walletBalance,
   seats,
-  currentUserId,
   gameState,
-  myPrivateCards,
+  privateState,
   cardBackMap,
+  turnRemainingMs,
   quickEmotesByUser,
   activeInteractiveEmote,
-  turnRemainingMs,
-  actionBusy,
+  onFireInteractive,
   onStartHand,
   onAction,
-  onFireInteractive,
 }: PokerTableProps) {
-  const { balance } = useWallet();
-  const { sound } = useSound();
   const { t } = useI18n();
+  const phase = gameState?.phase ?? 'waiting';
+  const street = gameState?.state?.street ?? 'preflop';
+  const pot = Number(gameState?.state?.pot ?? 0);
+  const currentBet = Number(gameState?.state?.current_bet ?? 0);
+  const minRaise = Number(gameState?.state?.min_raise ?? minBet);
+  const smallBlind = Number(gameState?.state?.small_blind ?? Math.max(10, Math.floor(minBet / 2)));
+  const bigBlind = Number(gameState?.state?.big_blind ?? minBet);
+  const communityCards = (gameState?.state?.community_cards ?? []) as PlayingCard[];
+  const playersMap = (gameState?.state?.players ?? {}) as Record<string, PokerPlayerState>;
+  const turnUserId = gameState?.turn_user_id ?? null;
+  const isMyTurn = turnUserId === myUserId;
 
-  const phase = gameState?.phase ?? 'lobby';
-  const street = (gameState?.state?.street ?? phase) as string;
-  const roundNumber = gameState?.state?.round_number ?? 0;
-  const pot = gameState?.state?.pot ?? 0;
-  const currentHighBet = gameState?.state?.current_high_bet ?? 0;
-  const minRaise = gameState?.state?.min_raise ?? Math.max(room.min_bet || 100, 50);
-  const smallBlind = gameState?.state?.small_blind ?? Math.max(Math.floor((room.min_bet || 100) / 2), 25);
-  const bigBlind = gameState?.state?.big_blind ?? Math.max(room.min_bet || 100, 50);
-  const dealerSeat = gameState?.state?.dealer_seat ?? null;
-  const sbSeat = gameState?.state?.sb_seat ?? null;
-  const bbSeat = gameState?.state?.bb_seat ?? null;
-  const communityCards = (gameState?.state?.community_cards ?? []) as Card[];
-  const pokerPlayers = (gameState?.state?.players ?? {}) as Record<string, PokerSeatState>;
-  const revealedHands = (gameState?.state?.revealed_hands ?? {}) as Record<string, Card[]>;
-  const lastAction = gameState?.state?.last_action;
+  const myPlayer = playersMap[myUserId] ?? null;
+  const myHoleCards = Array.isArray(privateState.hole_cards)
+    ? (privateState.hole_cards as PlayingCard[])
+    : [];
 
-  const myPokerState = currentUserId ? pokerPlayers[currentUserId] : undefined;
-  const myStreetBet = myPokerState?.street_bet ?? 0;
-  const callDiff = Math.max(0, currentHighBet - myStreetBet);
-  const minRaiseTo = currentHighBet + Math.max(minRaise, bigBlind);
+  const toCall = myPlayer ? Math.max(0, currentBet - Number(myPlayer.street_bet ?? 0)) : 0;
+  const minRaiseTarget = Math.max(currentBet + minRaise, bigBlind * 2);
 
-  const [raiseToAmount, setRaiseToAmount] = useState<number>(minRaiseTo);
+  const [raiseTo, setRaiseTo] = useState<number>(minRaiseTarget);
+  const [busy, setBusy] = useState(false);
+  const [tableErr, setTableErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setRaiseToAmount((prev) => (prev < minRaiseTo ? minRaiseTo : prev));
-  }, [minRaiseTo]);
+    setRaiseTo((prev) => Math.max(minRaiseTarget, prev));
+  }, [minRaiseTarget, gameState?.version]);
 
-  const isMyTurn = Boolean(currentUserId && gameState?.turn_user_id === currentUserId);
-  const turnPlayer = seats.find((s) => s.user_id === gameState?.turn_user_id) ?? null;
-  const turnSeconds = turnRemainingMs !== null ? (turnRemainingMs / 1000).toFixed(1) : null;
-  const turnProgressPct =
+  const turnSec = turnRemainingMs !== null ? (turnRemainingMs / 1000).toFixed(1) : null;
+  const turnPct =
     turnRemainingMs !== null ? Math.min(100, Math.max(0, (turnRemainingMs / 15000) * 100)) : 0;
+  const isUrgent = turnRemainingMs !== null && turnRemainingMs <= 4000;
 
-  const canStartHand =
-    seats.length >= 2 && (phase === 'lobby' || phase === 'settled' || phase === 'awaiting_players');
+  const activeTurnSeat = turnUserId ? seats.find((s) => s.user_id === turnUserId) ?? null : null;
 
-  const canAct =
-    phase === 'playing' &&
-    isMyTurn &&
-    myPokerState !== undefined &&
-    myPokerState.status === 'active';
-
-  function addRaiseChip(val: number) {
-    sound.play('chipClick');
-    setRaiseToAmount((prev) => {
-      const base = Math.max(prev, minRaiseTo);
-      const next = base + val;
-      if (balance !== null) {
-        const maxPossible = myStreetBet + balance;
-        return Math.min(next, Math.max(minRaiseTo, maxPossible));
-      }
-      return next;
-    });
+  async function runAction(fn: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setTableErr(null);
+    try {
+      await fn();
+    } catch (e) {
+      setTableErr(e instanceof Error ? e.message : 'Poker action failed.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <section className="table-felt casino-oval-felt poker-felt" aria-label="Texas Hold'em Poker table">
-      {/* Top Info Bar: Blinds, Street & Pot */}
-      <div className="rl-top-bar poker-top-bar">
-        <div>
-          <span className="eyebrow">
-            {t('poker.eyebrow')} · {t('poker.blinds')} {formatChips(smallBlind)} / {formatChips(bigBlind)}
+    <div className="table-felt casino-oval-felt poker-felt bj-felt">
+      {/* Top Status & Street Ribbon */}
+      <div className="bj-top-bar">
+        <div className="bj-top-meta">
+          <span className="casino-dealer-badge">HOLD&apos;EM</span>
+          <span className="badge badge--gold">{t('poker.eyebrow')}</span>
+          <span className="badge">
+            {t('poker.blinds')}: {formatChips(smallBlind)} / {formatChips(bigBlind)}
           </span>
-          <div className="muted small">
-            {roundNumber > 0
-              ? `${t('room.hand')} #${roundNumber} · ${street.toUpperCase()}`
-              : t('poker.waitingPlayers')}
-          </div>
+          {gameState?.state?.round_number ? (
+            <span className="badge">
+              {t('room.hand')} #{gameState.state.round_number}
+            </span>
+          ) : null}
+          <span className="badge">STREET: {street.toUpperCase()}</span>
         </div>
 
-        <div className="row">
-          <div className="room-minbet-box poker-pot-box">
-            <CasinoChipSvg value={500} size={28} />
-            <div>
-              <span className="muted small">{t('poker.pot')}</span>
-              <strong className="gold-text tabular" style={{ display: 'block', fontSize: '1.1rem' }}>
-                {formatChips(pot)} {t('room.chips')}
-              </strong>
-            </div>
+        {turnUserId && turnSec !== null ? (
+          <div className={`bj-clock${isUrgent ? ' bj-clock--urgent' : ''}`}>
+            <span className="bj-clock__who">
+              {isMyTurn ? t('poker.yourTurn') : `${activeTurnSeat?.username ?? 'Player'} · ${t('room.acting')}`}
+            </span>
+            <strong className="bj-clock__sec">{turnSec}s</strong>
           </div>
-          {currentHighBet > 0 && phase === 'playing' && (
-            <div className="room-minbet-box">
-              <span className="muted small">{t('poker.highBet')}</span>
-              <strong className="tabular">{formatChips(currentHighBet)}</strong>
-            </div>
-          )}
-        </div>
+        ) : (
+          <span className="muted" style={{ fontSize: '0.8rem' }}>
+            {phase === 'waiting' ? t('poker.waitingPlayers') : t('room.settled')}
+          </span>
+        )}
       </div>
 
-      {/* Community Cards Track + Pot + Action Console */}
-      <div className="table-felt__center bj-center-ribbon poker-board-center">
-        <div className="bj-rules-arch">
-          TEXAS HOLD&apos;EM · NO-LIMIT · DEALER BUTTON ROTATES CLOCKWISE
+      {turnUserId && turnRemainingMs !== null ? (
+        <div className="turn-bar" style={{ marginBottom: '0.9rem' }}>
+          <div
+            className={`turn-bar__fill${isUrgent ? ' turn-bar__fill--urgent' : ''}`}
+            style={{ width: `${turnPct}%` }}
+          />
+        </div>
+      ) : null}
+
+      {/* Center Community Cards & Pot */}
+      <div className="bj-dealer-zone">
+        <div className="bj-dealer-header">
+          <span className="bj-dealer-label">COMMUNITY BOARD &amp; {t('poker.pot').toUpperCase()}</span>
+          <span className="bj-hand-total bj-hand-total--bj">
+            {t('poker.pot').toUpperCase()}: {formatChips(pot)} {t('room.chips').toUpperCase()}
+          </span>
         </div>
 
-        {/* 5 Community Card Slots */}
-        <div className="poker-community-row" aria-label="Community cards">
+        <div className="poker-community-row">
           {[0, 1, 2, 3, 4].map((slotIdx) => {
             const card = communityCards[slotIdx];
-            const slotLabel = slotIdx < 3 ? 'FLOP' : slotIdx === 3 ? 'TURN' : 'RIVER';
             return card ? (
-              <PlayingCardSvg
-                key={`comm-${slotIdx}-${card.rank}-${card.suit}`}
-                card={card}
-                width={86}
-                height={120}
-                className="bj-card-anim"
-              />
+              <div key={slotIdx} className="bj-card-slot">
+                <PlayingCardSvg card={card} width={82} height={116} className="bj-card-anim" />
+              </div>
             ) : (
-              <div key={`comm-empty-${slotIdx}`} className="poker-community-placeholder">
-                <span>{slotLabel}</span>
+              <div key={slotIdx} className="poker-community-placeholder">
+                <span>{slotIdx < 3 ? 'FLOP' : slotIdx === 3 ? 'TURN' : 'RIVER'}</span>
               </div>
             );
           })}
         </div>
-
-        {lastAction && (
-          <div className="row row--center">
-            <span className="last-action-pill">
-              <strong>{lastAction.type.toUpperCase()}</strong>
-              {lastAction.amount ? ` · ${formatChips(lastAction.amount)}` : ''}
-              {lastAction.forced_by_timeout && (
-                <span className="badge badge--timeout">15s → AFK</span>
-              )}
-            </span>
-          </div>
-        )}
-
-        {/* 15s Turn Spotlight */}
-        {turnPlayer && turnSeconds !== null && (
-          <div className="turn-spotlight">
-            <div className="turn-spotlight__title">
-              {isMyTurn ? (
-                <span className="gold-text">{t('poker.yourTurn')}</span>
-              ) : (
-                <span>{t('bj.playerActing', { player: turnPlayer.username })}</span>
-              )}
-              <span className={`turn-clock tabular${Number(turnSeconds) <= 5 ? ' turn-clock--urgent' : ''}`}>
-                {turnSeconds}s
-              </span>
-            </div>
-            <div className="turn-progress" aria-hidden="true">
-              <div
-                className={`turn-progress__fill${Number(turnSeconds) <= 5 ? ' is-urgent' : ''}`}
-                style={{ width: `${turnProgressPct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Deal Next Hand CTA */}
-        {phase !== 'playing' && (
-          <div className="row row--center" style={{ marginTop: '0.4rem' }}>
-            {canStartHand ? (
-              <button
-                type="button"
-                className="btn btn--gold"
-                onClick={() => void onStartHand()}
-                disabled={actionBusy}
-              >
-                {actionBusy
-                  ? t('poker.dealing')
-                  : `${t('poker.dealNextHand')} (${formatChips(smallBlind)}/${formatChips(bigBlind)})`}
-              </button>
-            ) : (
-              <span className="muted small">{t('poker.waitingPlayers')}</span>
-            )}
-          </div>
-        )}
-
-        {/* Active Player Betting & Action Bar */}
-        {canAct && (
-          <div className="bj-betting-console">
-            <div className="bj-action-bar">
-              <button
-                type="button"
-                className="btn btn--ghost bj-action-btn"
-                onClick={() => void onAction('fold')}
-                disabled={actionBusy}
-              >
-                {t('poker.fold')}
-              </button>
-
-              {callDiff === 0 ? (
-                <button
-                  type="button"
-                  className="btn btn--gold bj-action-btn"
-                  onClick={() => void onAction('check')}
-                  disabled={actionBusy}
-                >
-                  {t('poker.check')}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--gold bj-action-btn"
-                  onClick={() => void onAction('call')}
-                  disabled={actionBusy}
-                >
-                  {t('poker.call')} {formatChips(callDiff)}
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="btn btn--gold bj-action-btn"
-                onClick={() => void onAction('raise', raiseToAmount)}
-                disabled={
-                  actionBusy ||
-                  (balance !== null && raiseToAmount - myStreetBet > balance) ||
-                  raiseToAmount < minRaiseTo
-                }
-              >
-                {t('poker.raiseTo')} {formatChips(raiseToAmount)}
-              </button>
-
-              <button
-                type="button"
-                className="btn btn--ghost bj-action-btn"
-                onClick={() => void onAction('all_in')}
-                disabled={actionBusy || (balance !== null && balance <= 0)}
-              >
-                {t('poker.allIn')} {balance !== null ? `(${formatChips(balance)})` : ''}
-              </button>
-            </div>
-
-            <div className="bj-chip-rack" role="group" aria-label="Increase raise amount">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setRaiseToAmount(minRaiseTo)}
-                disabled={actionBusy}
-                data-silent
-              >
-                {t('room.min')} ({formatChips(minRaiseTo)})
-              </button>
-              {RAISE_CHIPS.map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  className="bj-chip-btn"
-                  onClick={() => addRaiseChip(val)}
-                  disabled={actionBusy}
-                  title={`+${formatChips(val)}`}
-                  data-silent
-                >
-                  <CasinoChipSvg value={val} size={42} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Seated Players & Hole Cards */}
-      <div className="seats-grid seats-grid--arc">
+      <div className="bj-felt-arch">
+        <span>NO-LIMIT HOLD&apos;EM &bull; BEST 5 OF 7 CARDS &bull; 15S SHOT CLOCK</span>
+      </div>
+
+      {/* Player Seats Grid */}
+      <div className="bj-seats-grid seats-grid--arc">
         {seats.map((seat) => {
-          const isTurn = gameState?.turn_user_id === seat.user_id;
-          const isMe = currentUserId === seat.user_id;
-          const pState = pokerPlayers[seat.user_id];
+          const isMe = seat.user_id === myUserId;
+          const isTurn = turnUserId === seat.user_id;
+          const pState = playersMap[seat.user_id];
           const quickBubble = quickEmotesByUser[seat.user_id];
+          const equippedBack = seat.equipped_card_back
+            ? cardBackMap.get(seat.equipped_card_back)
+            : null;
+          const cardBackUrl = equippedBack
+            ? resolveCardBackUrl(equippedBack)
+            : DEFAULT_CARD_BACK_URL;
+
           const incomingHit =
             activeInteractiveEmote && activeInteractiveEmote.target_id === seat.user_id
               ? activeInteractiveEmote
               : null;
-          const outgoingCast =
-            activeInteractiveEmote && activeInteractiveEmote.sender_id === seat.user_id
-              ? activeInteractiveEmote
-              : null;
-          const cbItem = seat.equipped_card_back ? cardBackMap.get(seat.equipped_card_back) : null;
-          const cardBackUrl = cbItem ? resolveCardBackUrl(cbItem) : DEFAULT_CARD_BACK_URL;
 
-          const revealed = revealedHands[seat.user_id];
-          const holeCardsToShow: Card[] =
-            isMe && myPrivateCards.length > 0
-              ? myPrivateCards
-              : Array.isArray(revealed) && revealed.length > 0
-                ? revealed
+          const faceUpCards: PlayingCard[] =
+            pState?.revealed_cards && pState.revealed_cards.length > 0
+              ? pState.revealed_cards
+              : isMe
+                ? myHoleCards
                 : [];
+
+          const showFaceDownHole =
+            !isMe &&
+            pState &&
+            pState.status === 'active' &&
+            (!pState.revealed_cards || pState.revealed_cards.length === 0) &&
+            phase === 'playing';
 
           return (
             <div
               key={seat.user_id}
-              className={`seat-card bj-seat-card${isTurn ? ' seat-card--turn' : ''}${
-                seat.status === 'afk' ? ' seat-card--afk' : ''
-              }${incomingHit ? ' seat-card--hit' : ''}${outgoingCast ? ' seat-card--casting' : ''}`}
+              className={[
+                'bj-seat-box',
+                isTurn ? 'bj-seat-box--turn' : '',
+                isMe ? 'bj-seat-box--me' : '',
+                seat.status === 'afk' || pState?.status === 'folded' ? 'seat-card--afk' : '',
+                incomingHit ? 'seat-card--hit' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
-              {quickBubble && (
-                <div key={quickBubble.id} className="quick-emote-bubble" role="status">
+              {quickBubble ? (
+                <div className="quick-emote-bubble" key={quickBubble.id}>
                   <span className="quick-emote-bubble__sym">{quickBubble.symbol}</span>
                   <span>{quickBubble.phrase}</span>
                 </div>
-              )}
+              ) : null}
 
-              {incomingHit && (
-                <div key={incomingHit.id} className="seat-hit-overlay" role="status">
-                  <EmoteVectorIcon animation={incomingHit.animation} size={48} />
+              {incomingHit ? (
+                <div className="seat-hit-overlay" key={incomingHit.id} role="status">
+                  <EmoteVectorIcon animation={incomingHit.animation} size={44} />
                   <span className="emote-stage__impact">
                     {EMOTE_SPECS[incomingHit.animation]?.impactWord ?? 'HIT!'}
                   </span>
                 </div>
-              )}
+              ) : null}
 
-              <div className="seat-card__top">
-                <div className="row" style={{ gap: '0.35rem' }}>
-                  <span className="muted small tabular">
-                    {t('room.seat')} #{seat.seat + 1}
-                  </span>
-                  {dealerSeat === seat.seat && <span className="badge badge--bj-win">D</span>}
-                  {sbSeat === seat.seat && <span className="badge">SB</span>}
-                  {bbSeat === seat.seat && <span className="badge">BB</span>}
-                </div>
-                <div className="row">
-                  {seat.status === 'afk' ? (
-                    <span className="badge badge--timeout">AFK</span>
-                  ) : pState?.status === 'folded' ? (
-                    <span className="badge badge--timeout">Folded</span>
-                  ) : pState?.status === 'all_in' ? (
-                    <span className="badge badge--bj-win">ALL-IN</span>
-                  ) : isTurn ? (
-                    <span className="badge badge--open">{t('room.acting')}</span>
+              {/* Dealer / SB / BB Badges */}
+              {pState ? (
+                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                  {pState.is_dealer ? <span className="badge badge--gold">DEALER (D)</span> : null}
+                  {pState.is_sb ? <span className="badge">SB</span> : null}
+                  {pState.is_bb ? <span className="badge">BB</span> : null}
+                  {pState.status === 'folded' ? (
+                    <span className="badge badge--timeout">FOLDED</span>
                   ) : null}
                 </div>
-              </div>
+              ) : null}
 
-              <div className="seat-card__identity">
-                <Avatar avatarId={seat.avatar_id} userId={seat.user_id} size={46} />
-                <div className="seat-card__meta">
-                  <strong className="seat-card__name">
-                    {seat.username} {isMe ? t('room.you') : ''}
-                  </strong>
-                  <span className="muted small">
-                    {pState ? `${t('poker.pot')}: ${formatChips(pState.total_bet)}` : 'Seated'}
-                  </span>
-                </div>
-              </div>
-
-              {pState && (
-                <div className="bj-seat-hand">
-                  <div className="bj-seat-hand__meta">
-                    <span className="badge tabular">Bet: {formatChips(pState.street_bet)}</span>
-                    {pState.hand_name && (
-                      <span className="badge badge--open">{pState.hand_name}</span>
-                    )}
-                  </div>
-
-                  <div className="bj-cards-row bj-cards-row--seat">
-                    {holeCardsToShow.length > 0 ? (
-                      holeCardsToShow.map((c, idx) => (
+              {/* Hole Cards Area */}
+              <div className="bj-seat-cards">
+                {faceUpCards.length > 0 ? (
+                  <div className="bj-cards-fan">
+                    {faceUpCards.map((c, idx) => (
+                      <div key={idx} className="bj-card-slot">
                         <PlayingCardSvg
-                          key={`${seat.user_id}-hole-${idx}-${c.rank}-${c.suit}`}
                           card={c}
                           cardBackUrl={cardBackUrl}
                           width={70}
                           height={98}
                           className="bj-card-anim"
                         />
-                      ))
-                    ) : pState.status !== 'folded' && roundNumber > 0 ? (
-                      <>
-                        <PlayingCardSvg hidden cardBackUrl={cardBackUrl} width={66} height={94} />
-                        <PlayingCardSvg hidden cardBackUrl={cardBackUrl} width={66} height={94} />
-                      </>
-                    ) : null}
+                      </div>
+                    ))}
                   </div>
-
-                  {phase === 'settled' && pState.payout !== undefined && (
-                    <div className="bj-seat-outcome">
-                      <span
-                        className={`badge ${
-                          pState.payout > 0 ? 'badge--bj-win' : 'badge--timeout'
-                        }`}
-                      >
-                        {pState.payout > 0
-                          ? `WON +${formatChips(pState.payout)} (${pState.hand_name ?? 'Best Hand'})`
-                          : `Lost ${formatChips(pState.total_bet)}`}
-                      </span>
+                ) : showFaceDownHole ? (
+                  <div className="bj-cards-fan">
+                    <div className="bj-card-slot">
+                      <PlayingCardSvg
+                        hidden
+                        cardBackUrl={cardBackUrl}
+                        width={68}
+                        height={96}
+                      />
                     </div>
-                  )}
-                </div>
-              )}
+                    <div className="bj-card-slot">
+                      <PlayingCardSvg
+                        hidden
+                        cardBackUrl={cardBackUrl}
+                        width={68}
+                        height={96}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bj-seat-cardback-idle" title={equippedBack?.name ?? 'Card Back'}>
+                    <PlayingCardSvg
+                      hidden
+                      cardBackUrl={cardBackUrl}
+                      width={46}
+                      height={64}
+                    />
+                  </div>
+                )}
+              </div>
 
-              {!isMe && (
+              {/* Hand rank & outcome pill */}
+              {pState ? (
+                <div className="bj-seat-meta-row">
+                  {pState.total_bet > 0 ? (
+                    <span className="bj-bet-pill">In Pot: {formatChips(pState.total_bet)}</span>
+                  ) : null}
+                  {pState.hand_label ? (
+                    <span className="bj-hand-total bj-hand-total--bj">{pState.hand_label}</span>
+                  ) : null}
+                  {phase === 'settled' && pState.is_winner ? (
+                    <span className="badge badge--bj-win">
+                      WINNER (+{formatChips(pState.payout)})
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Player Footer */}
+              <div className="bj-seat-footer">
+                <Avatar avatarId={seat.avatar_id} userId={seat.user_id} size={42} />
+                <div className="bj-seat-identity">
+                  <div className="bj-seat-name">
+                    #{seat.seat + 1} {seat.username}
+                    {isMe ? <span className="seat-card__you">{t('room.you')}</span> : null}
+                  </div>
+                  <div className="bj-seat-sub">
+                    {seat.status === 'afk' ? (
+                      <span style={{ color: '#f29ca8' }}>AFK</span>
+                    ) : isTurn ? (
+                      <span style={{ color: 'var(--gold-light)' }}>{t('room.acting')}…</span>
+                    ) : pState ? (
+                      <span>
+                        {t('poker.highBet')}: {formatChips(pState.street_bet)}
+                      </span>
+                    ) : (
+                      <span>{t('room.tableReady')}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {!isMe ? (
                 <button
                   type="button"
                   className="btn btn--ghost btn--sm seat-target-btn"
@@ -445,11 +337,120 @@ export function PokerTable({
                 >
                   {t('room.targetEmote')}
                 </button>
-              )}
+              ) : null}
             </div>
           );
         })}
       </div>
-    </section>
+
+      {/* Action Controls Bar */}
+      <div className="bj-controls-bar">
+        {tableErr ? (
+          <div className="alert alert--error" style={{ marginBottom: '0.65rem' }}>
+            {tableErr}
+          </div>
+        ) : null}
+
+        {phase === 'waiting' || phase === 'settled' || phase === 'lobby' ? (
+          <div className="bj-controls-Idle">
+            <div>
+              <strong style={{ color: 'var(--gold-light)' }}>
+                {phase === 'settled' ? t('room.settled') : t('poker.eyebrow')}
+              </strong>
+              <p className="muted" style={{ margin: '0.15rem 0 0', fontSize: '0.82rem' }}>
+                {t('poker.blinds')}: {formatChips(smallBlind)} / {formatChips(bigBlind)} {t('room.chips')}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--gold"
+              disabled={busy}
+              onClick={() => void runAction(onStartHand)}
+            >
+              {busy ? t('poker.dealing') : t('poker.dealNextHand')}
+            </button>
+          </div>
+        ) : null}
+
+        {phase === 'playing' ? (
+          <div className="bj-controls-betting">
+            <div className="bj-chip-rack">
+              {CHIP_DENOMS.map((denom) => (
+                <button
+                  key={denom}
+                  type="button"
+                  className="bj-chip-btn"
+                  disabled={!isMyTurn || busy}
+                  onClick={() => setRaiseTo((prev) => Math.max(minRaiseTarget, prev + denom))}
+                  title={`+${denom}`}
+                >
+                  <CasinoChipSvg value={denom} size={46} />
+                </button>
+              ))}
+            </div>
+
+            <div className="bj-bet-submit-group">
+              <div className="bj-wager-readout">
+                <span className="bj-wager-readout__label">{t('poker.raiseTo').toUpperCase()}</span>
+                <strong className="bj-wager-readout__val">{formatChips(raiseTo)}</strong>
+              </div>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={!isMyTurn || busy}
+                onClick={() => setRaiseTo(minRaiseTarget)}
+              >
+                {t('room.min')} ({formatChips(minRaiseTarget)})
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={!isMyTurn || busy}
+                onClick={() => void runAction(() => onAction('fold'))}
+              >
+                {t('poker.fold')}
+              </button>
+              {toCall === 0 ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!isMyTurn || busy}
+                  onClick={() => void runAction(() => onAction('check'))}
+                >
+                  {t('poker.check')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={
+                    !isMyTurn ||
+                    busy ||
+                    (walletBalance !== null && walletBalance < toCall)
+                  }
+                  onClick={() => void runAction(() => onAction('call'))}
+                >
+                  {t('poker.call')} {formatChips(toCall)}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--gold"
+                disabled={
+                  !isMyTurn ||
+                  busy ||
+                  (walletBalance !== null &&
+                    myPlayer !== null &&
+                    walletBalance < raiseTo - Number(myPlayer.street_bet ?? 0))
+                }
+                onClick={() => void runAction(() => onAction('raise', raiseTo))}
+              >
+                {t('poker.raiseTo')} {formatChips(raiseTo)}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
