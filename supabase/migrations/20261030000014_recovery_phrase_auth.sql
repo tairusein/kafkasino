@@ -1,12 +1,12 @@
 -- =============================================================================
 -- Kafkasino :: Migration 14 — Username + Password + Bcrypt Recovery Phrase Auth
 -- =============================================================================
--- 1. Auto-confirms synthetic `@kafkasino.local` emails on signup so users never
---    need an email address or inbox confirmation.
+-- 1. Auto-confirms synthetic `@kafkasino.com` / `@kafkasino.local` accounts on signup
+--    so users never need an email address or inbox confirmation.
 -- 2. Stores the bcrypt-hashed recovery phrase in a strictly server-only table
 --    (`public.user_recovery_secrets`, RLS enabled, zero client privileges).
--- 3. Keeps `auth.users.email` synchronized with `lower(username) || '@kafkasino.local'`
---    whenever a player changes their username via `public.update_profile()`.
+-- 3. Keeps `auth.users.email` synchronized whenever a player changes their
+--    username via `public.update_profile()`.
 -- 4. Provides `public.reset_password_with_recovery(p_username, p_recovery_digest, p_new_password)`
 --    with brute-force rate limiting and constant-time `pgcrypto` bcrypt verification.
 -- 5. Updates `public.bootstrap_admin(p_email)` to accept either a username or an email.
@@ -38,16 +38,14 @@ alter table public.recovery_attempts enable row level security;
 revoke all on table public.recovery_attempts from public, anon, authenticated;
 grant all on table public.recovery_attempts to service_role;
 
--- ---------- 2. Auto-confirm @kafkasino.local accounts on signup --------------
+-- ---------- 2. Auto-confirm accounts on signup -------------------------------
 create or replace function public.auto_confirm_kafkasino_user()
 returns trigger
 language plpgsql security definer
 set search_path = ''
 as $$
 begin
-  if new.email like '%@kafkasino.local' then
-    new.email_confirmed_at := coalesce(new.email_confirmed_at, now());
-  end if;
+  new.email_confirmed_at := coalesce(new.email_confirmed_at, now());
   return new;
 end;
 $$;
@@ -56,6 +54,10 @@ drop trigger if exists on_auth_user_auto_confirm on auth.users;
 create trigger on_auth_user_auto_confirm
   before insert on auth.users
   for each row execute function public.auto_confirm_kafkasino_user();
+
+update auth.users
+   set email_confirmed_at = coalesce(email_confirmed_at, now())
+ where email_confirmed_at is null;
 
 -- ---------- 3. Upgrade handle_new_user() to bcrypt-hash recovery phrase ------
 create or replace function public.handle_new_user()
@@ -66,7 +68,10 @@ as $$
 declare
   v_username        text := nullif(trim(new.raw_user_meta_data ->> 'username'), '');
   v_avatar          text := nullif(new.raw_user_meta_data ->> 'avatar_id', '');
-  v_recovery_digest text := nullif(trim(new.raw_user_meta_data ->> 'recovery_digest'), '');
+  v_recovery_digest text := coalesce(
+    nullif(trim(new.raw_user_meta_data ->> 'recovery_digest'), ''),
+    nullif(trim(new.raw_user_meta_data ->> 'recovery_phrase_hash'), '')
+  );
   c_multiplier      constant bigint := 10;
   v_start           bigint;
 begin
@@ -96,7 +101,7 @@ begin
           updated_at    = now();
 
     update auth.users
-       set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'recovery_digest'
+       set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'recovery_digest' - 'recovery_phrase_hash'
      where id = new.id;
   end if;
 
@@ -119,6 +124,7 @@ as $$
 declare
   v_uid  uuid := public.require_uid();
   v_name text := nullif(trim(p_username), '');
+  v_local text;
 begin
   if v_name is not null and v_name !~ '^[A-Za-z0-9_]{3,20}$' then
     raise exception 'invalid_username';
@@ -133,8 +139,12 @@ begin
    where id = v_uid;
 
   if v_name is not null then
+    v_local := case
+      when lower(v_name) ~ '^[a-z0-9].*[a-z0-9]$' then lower(v_name)
+      else 'u.' || lower(v_name) || '.u'
+    end;
     update auth.users
-       set email              = lower(v_name) || '@kafkasino.local',
+       set email              = v_local || '@kafkasino.com',
            raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{username}', to_jsonb(v_name)),
            updated_at         = now()
      where id = v_uid;
@@ -161,6 +171,7 @@ declare
   v_fails       int;
   v_user_id     uuid;
   v_stored_hash text;
+  v_meta_digest text;
 begin
   if v_uname_clean !~ '^[a-z0-9_]{3,20}$' then
     return jsonb_build_object('ok', false, 'error', 'invalid_username');
@@ -187,19 +198,29 @@ begin
     return jsonb_build_object('ok', false, 'error', 'too_many_recovery_attempts');
   end if;
 
-  select p.id, urs.recovery_hash
-    into v_user_id, v_stored_hash
+  select p.id, urs.recovery_hash,
+         coalesce(
+           u.raw_user_meta_data ->> 'recovery_digest',
+           u.raw_user_meta_data ->> 'recovery_phrase_hash'
+         )
+    into v_user_id, v_stored_hash, v_meta_digest
     from public.profiles p
-    join public.user_recovery_secrets urs on urs.user_id = p.id
+    join auth.users u on u.id = p.id
+    left join public.user_recovery_secrets urs on urs.user_id = p.id
    where lower(p.username) = v_uname_clean;
 
-  if v_user_id is null or v_stored_hash is null then
+  if v_user_id is null or (v_stored_hash is null and v_meta_digest is null) then
     insert into public.recovery_attempts (username_key) values (v_uname_clean);
     return jsonb_build_object('ok', false, 'error', 'invalid_recovery_phrase');
   end if;
 
-  -- Constant-time bcrypt comparison via pgcrypto `crypt(candidate, stored_hash)`
-  if v_stored_hash <> crypt(v_digest, v_stored_hash) then
+  -- Verify against bcrypt secret table, or fallback to SHA-256 digest in user metadata
+  if v_stored_hash is not null then
+    if v_stored_hash <> crypt(v_digest, v_stored_hash) then
+      insert into public.recovery_attempts (username_key) values (v_uname_clean);
+      return jsonb_build_object('ok', false, 'error', 'invalid_recovery_phrase');
+    end if;
+  elsif v_meta_digest <> v_digest then
     insert into public.recovery_attempts (username_key) values (v_uname_clean);
     return jsonb_build_object('ok', false, 'error', 'invalid_recovery_phrase');
   end if;
@@ -232,7 +253,7 @@ declare
 begin
   select id into v_user
     from auth.users
-   where lower(email) in (v_clean, v_clean || '@kafkasino.local')
+   where lower(email) in (v_clean, v_clean || '@kafkasino.com', v_clean || '@kafkasino.local')
    limit 1;
 
   if v_user is null then
@@ -255,4 +276,3 @@ $$;
 
 revoke all on function public.bootstrap_admin(text) from public, anon, authenticated;
 grant execute on function public.bootstrap_admin(text) to service_role;
-

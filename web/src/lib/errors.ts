@@ -33,14 +33,15 @@ const SERVER_CODES: Record<string, string> = {
   not_your_turn: 'It is not your turn to act.',
   no_active_players: 'At least one active player is required.',
   invalid_action: 'Invalid game action.',
-  round_already_active: 'A hand is already in progress at this table.',
-  invalid_bet_amount: 'Bet amount must meet the table minimum.',
-  bet_already_placed: 'Your bet for this hand has already been placed.',
-  double_only_on_two_cards: 'Double Down is only available on your initial two cards.',
-  forbidden: 'You are not allowed to do that.',
-  tournament_not_found: 'That tournament could not be found.',
-  tournament_not_found_or_draft: 'Draft tournaments cannot be featured. Set status to Upcoming or Live first.',
-  registration_closed: 'Registration for this tournament is closed.',
+  round_in_progress: 'Wait for the current hand to finish.',
+  round_not_finished: 'The current round is still in progress.',
+  bet_out_of_range: 'Bet is below the table minimum or above the maximum.',
+  already_bet: 'You have already placed your bet for this round.',
+  cannot_double: 'Double Down is only available on your initial two cards.',
+  invalid_bet_type: 'Unsupported Roulette bet type.',
+  no_bets_placed: 'Place at least one chip on the layout before spinning.',
+  tournament_not_found: 'Tournament not found.',
+  tournament_not_open: 'Registration for this tournament is closed.',
   already_registered: 'You are already registered for this tournament.',
   tournament_full: 'This tournament has reached its maximum capacity.',
   not_registered: 'You are not registered for this tournament.',
@@ -64,7 +65,15 @@ export function friendlyError(err: unknown): string {
   if (SERVER_CODES[msg]) return SERVER_CODES[msg];
 
   if (/invalid login credentials/i.test(msg)) return 'Incorrect username or password.';
-  if (/user already registered/i.test(msg)) return 'That username is already taken. Please choose another.';
+  if (/user already registered|already been registered/i.test(msg)) {
+    return 'That username is already taken. Please choose another.';
+  }
+  if (/email not confirmed/i.test(msg)) {
+    return 'Incorrect username or password.';
+  }
+  if (/invalid.*email|email.*invalid|unable to validate/i.test(msg)) {
+    return 'Enter a valid username (3–20 letters, numbers or underscores).';
+  }
   // The signup trigger raises on a taken/invalid username; GoTrue wraps it generically.
   if (/database error saving new user/i.test(msg) || /profiles_username_lower_key/i.test(msg)) {
     return 'That username is already taken. Please choose another.';
@@ -73,7 +82,18 @@ export function friendlyError(err: unknown): string {
     return 'The featured homepage banner tournament cannot be in Draft status.';
   }
   if (/password should be at least/i.test(msg)) return 'Password must be at least 8 characters.';
-  if (/rate limit|too many requests/i.test(msg)) return 'Too many attempts. Please try again shortly.';
-  if (/failed to fetch|networkerror/i.test(msg)) return 'Cannot reach the server. Check your connection.';
-  return msg || 'Something went wrong. Please try again.';
+  if (/rate limit|too many requests|over_email_send_rate_limit/i.test(msg)) {
+    return 'Too many attempts. Please try again shortly.';
+  }
+  if (/failed to fetch|networkerror/i.test(msg)) {
+    return 'Cannot reach the server. Check your connection.';
+  }
+
+  // Scrub any internal synthetic domain or email terminology so the user never sees it.
+  const sanitized = msg
+    .replace(/[a-z0-9._-]+@kafkasino\.[a-z]+/gi, 'username')
+    .replace(/\bemail address\b/gi, 'username')
+    .replace(/\bemail\b/gi, 'username');
+
+  return sanitized || 'Something went wrong. Please try again.';
 }

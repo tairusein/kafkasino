@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AuthShell } from '../components/AuthShell';
 import { friendlyError } from '../lib/errors';
 import { hashRecoveryPhraseClient, normalizeRecoveryPhrase } from '../lib/recovery';
-import { supabase, usernameToInternalEmail } from '../lib/supabase';
+import { signInWithUsername, supabase } from '../lib/supabase';
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 
@@ -60,24 +60,20 @@ export function ForgotPasswordPage() {
       }
 
       const result = data as { ok?: boolean; error?: string } | null;
-      if (!result || result.ok !== true) {
+      if (!result?.ok) {
         setError(friendlyError(result?.error ?? 'invalid_recovery_phrase'));
         setBusy(false);
         return;
       }
 
-      // Password updated! Automatically sign the user in with their new password.
-      const internalEmail = usernameToInternalEmail(trimmedUsername);
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: internalEmail,
-        password: newPassword,
-      });
+      // Automatically sign the player in with their newly set password
+      const { error: signInErr } = await signInWithUsername(trimmedUsername, newPassword);
 
       if (signInErr) {
-        // Password was reset, let them proceed to login page
         setResetComplete(true);
+        setBusy(false);
       }
-      setBusy(false);
+      // If signIn succeeded, AuthProvider + <PublicOnly> will redirect to the lobby.
     } catch (err) {
       setError(friendlyError(err));
       setBusy(false);
@@ -87,15 +83,18 @@ export function ForgotPasswordPage() {
   if (resetComplete) {
     return (
       <AuthShell
-        title="Password Reset Complete"
-        subtitle="Your new password is now active."
+        title="Password updated"
+        subtitle="Your password has been reset using your Recovery Phrase."
       >
-        <p className="form-ok">
-          Your password has been verified and updated using your Recovery Phrase.
-        </p>
-        <Link className="btn btn--gold btn--block" to="/login" state={location.state}>
-          Continue to Sign In
-        </Link>
+        <div className="stack">
+          <p className="muted">
+            You can now sign in with your username <strong>{username.trim()}</strong> and your new
+            password.
+          </p>
+          <Link className="btn btn--gold btn--block" to="/login" state={location.state}>
+            Return to Sign in
+          </Link>
+        </div>
       </AuthShell>
     );
   }
@@ -103,7 +102,7 @@ export function ForgotPasswordPage() {
   return (
     <AuthShell
       title="Account Recovery"
-      subtitle="Provide your username and 12-word Recovery Phrase to set a new password."
+      subtitle="Enter your username and 12-word Recovery Phrase to set a new password."
     >
       <form className="form" onSubmit={onSubmit}>
         <label className="field">
@@ -183,4 +182,3 @@ export function ForgotPasswordPage() {
     </AuthShell>
   );
 }
-

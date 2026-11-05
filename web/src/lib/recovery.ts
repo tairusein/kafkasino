@@ -1,5 +1,5 @@
 /**
- * Cryptographic 12-Word Recovery Phrase (Seed Phrase) Generator & Client Pre-Hasher.
+ * Cryptographic 12-Word Recovery Phrase (Seed Phrase) Generator & SHA-256 Hasher.
  *
  * Security Architecture:
  * 1. Generation uses `window.crypto.getRandomValues` over a 256-word unambiguous
@@ -51,8 +51,10 @@ const WORDLIST_256: readonly string[] = [
   'viceroy', 'vintage', 'virtuoso', 'viscount', 'voyager', 'warden', 'whisper', 'zephyr',
 ];
 
+const LOCAL_RECOVERY_HASH_KEY = 'kafkasino.recovery_hashes';
+
 /**
- * Generates a cryptographically random 12-word recovery phrase.
+ * Generates a cryptographically random 12-word recovery phrase using `window.crypto.getRandomValues`.
  */
 export function generateRecoveryPhrase(): string[] {
   const randomBytes = new Uint8Array(12);
@@ -84,9 +86,25 @@ export async function hashRecoveryPhraseClient(
   const normalized = normalizeRecoveryPhrase(phrase);
   const payload = `kafkasino.recovery.v1:${normalized}`;
   const bytes = new TextEncoder().encode(payload);
-  const digestBuffer = await window.crypto.subtle.digest('SHA-256', bytes);
+  const digestBuffer = await window.crypto.subtle.digest('SHA-256', bytes as BufferSource);
   const digestArray = Array.from(new Uint8Array(digestBuffer));
   return digestArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Stores ONLY the irreversible SHA-256 hex digest for a username in localStorage
+ * as a secondary verification record (never stores the raw phrase).
+ */
+export function saveLocalRecoveryHash(username: string, sha256HexDigest: string): void {
+  try {
+    const key = username.trim().toLowerCase();
+    const raw = localStorage.getItem(LOCAL_RECOVERY_HASH_KEY);
+    const map: Record<string, string> = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    map[key] = sha256HexDigest;
+    localStorage.setItem(LOCAL_RECOVERY_HASH_KEY, JSON.stringify(map));
+  } catch {
+    /* localStorage unavailable */
+  }
 }
 
 /**
@@ -114,9 +132,9 @@ export function downloadRecoveryPhraseTxt(username: string, words: readonly stri
     '------------------------------------------------------------',
     '',
     'IMPORTANT SECURITY NOTICE:',
-    '- Kafkasino does not use email addresses.',
-    '- Your Recovery Phrase is hashed with bcrypt and is NEVER',
-    '  stored in plain text on our servers.',
+    '- Kafkasino uses pure Username authentication (no email).',
+    '- Your Recovery Phrase is hashed (SHA-256 + bcrypt) and is',
+    '  NEVER stored in plain text.',
     '- Anyone with this 12-word phrase can reset your password.',
     '- Store this file in a safe place.',
     '============================================================',
@@ -133,4 +151,3 @@ export function downloadRecoveryPhraseTxt(username: string, words: readonly stri
   document.body.removeChild(anchor);
   window.setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-

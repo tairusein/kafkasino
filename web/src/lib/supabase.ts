@@ -21,13 +21,38 @@ export const supabaseAnonKey = rawAnonKey;
 /**
  * Converts a username into a deterministic internal email for Supabase Auth (`auth.users`).
  * The user never sees or types an email address anywhere in the UI.
+ *
+ * Uses a valid ICANN domain (`kafkasino.com`) by default so hosted Supabase Cloud
+ * GoTrue email validation succeeds without requiring custom auth server flags, while
+ * remaining backward-compatible with `@kafkasino.local`.
  */
-export function usernameToInternalEmail(username: string): string {
+export function usernameToInternalEmail(
+  username: string,
+  domain: 'kafkasino.com' | 'kafkasino.local' = 'kafkasino.com',
+): string {
   const normalized = username
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '');
-  return `${normalized}@kafkasino.local`;
+  const safeLocal =
+    /^[a-z0-9].*[a-z0-9]$/.test(normalized) || /^[a-z0-9]$/.test(normalized)
+      ? normalized
+      : `u.${normalized}.u`;
+  return `${safeLocal}@${domain}`;
+}
+
+export function usernameToInternalEmails(username: string): string[] {
+  const normalized = username
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  const candidates = [
+    usernameToInternalEmail(username, 'kafkasino.com'),
+    usernameToInternalEmail(username, 'kafkasino.local'),
+    `${normalized}@kafkasino.local`,
+    `${normalized}@kafkasino.com`,
+  ];
+  return Array.from(new Set(candidates));
 }
 
 /**
@@ -72,3 +97,66 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+/**
+ * Signs up a user purely by username + password, transparently mapping the username
+ * to an internal Supabase Auth identifier under the hood.
+ */
+export async function signUpWithUsername(
+  username: string,
+  password: string,
+  metadata: Record<string, unknown>,
+) {
+  const primaryEmail = usernameToInternalEmail(username, 'kafkasino.com');
+  const firstAttempt = await supabase.auth.signUp({
+    email: primaryEmail,
+    password,
+    options: { data: metadata },
+  });
+
+  if (
+    firstAttempt.error &&
+    /invalid.*email|email.*invalid|unable to validate/i.test(firstAttempt.error.message ?? '')
+  ) {
+    const fallbackEmail = usernameToInternalEmail(username, 'kafkasino.local');
+    return supabase.auth.signUp({
+      email: fallbackEmail,
+      password,
+      options: { data: metadata },
+    });
+  }
+
+  return firstAttempt;
+}
+
+/**
+ * Signs in a user purely by username + password, trying both current (`@kafkasino.com`)
+ * and legacy (`@kafkasino.local`) internal formats transparently.
+ */
+export async function signInWithUsername(username: string, password: string) {
+  const emails = usernameToInternalEmails(username);
+  let lastResult = await supabase.auth.signInWithPassword({
+    email: emails[0],
+    password,
+  });
+
+  if (!lastResult.error) {
+    return lastResult;
+  }
+
+  for (let i = 1; i < emails.length; i++) {
+    if (!/invalid login credentials/i.test(lastResult.error?.message ?? '')) {
+      break;
+    }
+    const nextResult = await supabase.auth.signInWithPassword({
+      email: emails[i],
+      password,
+    });
+    if (!nextResult.error) {
+      return nextResult;
+    }
+    lastResult = nextResult;
+  }
+
+  return lastResult;
+}

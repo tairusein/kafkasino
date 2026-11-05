@@ -8,12 +8,14 @@ import {
   downloadRecoveryPhraseTxt,
   generateRecoveryPhrase,
   hashRecoveryPhraseClient,
+  saveLocalRecoveryHash,
 } from '../lib/recovery';
 import {
   getRememberMe,
   setRememberMe,
+  signInWithUsername,
+  signUpWithUsername,
   supabase,
-  usernameToInternalEmail,
 } from '../lib/supabase';
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -79,9 +81,8 @@ export function RegisterPage() {
     setRememberMe(remember);
 
     const trimmedUsername = username.trim();
-    const internalEmail = usernameToInternalEmail(trimmedUsername);
 
-    // 1. Generate 12-word recovery phrase and pre-hash it with SHA-256 before leaving the browser
+    // 1. Generate 12-word recovery phrase using window.crypto.getRandomValues and hash with SHA-256
     const words = generateRecoveryPhrase();
     const recoveryDigest = await hashRecoveryPhraseClient(words);
 
@@ -89,19 +90,11 @@ export function RegisterPage() {
     //    does not redirect away before the user downloads or copies their phrase.
     setPendingRecoveryAck(true);
 
-    const { data, error: err } = await supabase.auth.signUp({
-      email: internalEmail,
-      password,
-      // Read by the server-side signup trigger, which validates username/avatar,
-      // bcrypt-hashes `recovery_digest` into `public.user_recovery_secrets` (and removes
-      // it from metadata), and grants the 10x starting balance.
-      options: {
-        data: {
-          username: trimmedUsername,
-          avatar_id: avatarId,
-          recovery_digest: recoveryDigest,
-        },
-      },
+    const { data, error: err } = await signUpWithUsername(trimmedUsername, password, {
+      username: trimmedUsername,
+      avatar_id: avatarId,
+      recovery_digest: recoveryDigest,
+      recovery_phrase_hash: recoveryDigest,
     });
 
     if (err) {
@@ -111,13 +104,12 @@ export function RegisterPage() {
       return;
     }
 
-    // If Supabase project had email confirmation enabled before the auto-confirm trigger ran,
-    // immediately sign in with password so the user has an active session ready.
+    // Store only the SHA-256 hash locally (never the plaintext recovery phrase)
+    saveLocalRecoveryHash(trimmedUsername, recoveryDigest);
+
+    // Ensure an active session is established immediately
     if (!data.session) {
-      await supabase.auth.signInWithPassword({
-        email: internalEmail,
-        password,
-      });
+      await signInWithUsername(trimmedUsername, password);
     }
 
     setRecoveryWords(words);
@@ -271,9 +263,8 @@ export function RegisterPage() {
               <span className="eyebrow">Mandatory Security Backup</span>
               <h2 id="recovery-modal-title">Save Your 12-Word Recovery Phrase</h2>
               <p className="muted small">
-                Kafkasino does not use email addresses. This 12-word Recovery Phrase is the{' '}
-                <strong>only way</strong> to reset your password if you ever forget it. Save it now
-                before entering the lobby.
+                This 12-word Recovery Phrase is the <strong>only way</strong> to reset your password
+                if you ever forget it. Save it now before entering the lobby.
               </p>
             </div>
 

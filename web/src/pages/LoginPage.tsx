@@ -5,8 +5,7 @@ import { friendlyError } from '../lib/errors';
 import {
   getRememberMe,
   setRememberMe,
-  supabase,
-  usernameToInternalEmail,
+  signInWithUsername,
 } from '../lib/supabase';
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -32,11 +31,7 @@ export function LoginPage() {
     // Must be set BEFORE signing in so the session is written to the right storage.
     setRememberMe(remember);
 
-    const internalEmail = usernameToInternalEmail(trimmedUsername);
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email: internalEmail,
-      password,
-    });
+    const { error: err } = await signInWithUsername(trimmedUsername, password);
 
     if (err) {
       setError(friendlyError(err));
