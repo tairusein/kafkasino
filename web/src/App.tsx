@@ -3,6 +3,7 @@ import { PublicOnly, RequireAdmin, RequireAuth } from './auth/guards';
 import { AppLayout, AuthedProviders } from './components/AppLayout';
 import { GlobalLoader } from './components/GlobalLoader';
 import { AdminPage } from './pages/AdminPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { GameRoomPage } from './pages/GameRoomPage';
 import { HomePage } from './pages/HomePage';
 import { LobbyPage } from './pages/LobbyPage';
@@ -14,8 +15,8 @@ import { ShopPage } from './pages/ShopPage';
 import { TournamentPage } from './pages/TournamentPage';
 
 /**
- * Every core section is a dedicated, fully routable page (no modals):
- *   /login  /register                    public only
+ * Every core section is a dedicated, fully routable page (no modals for core sections):
+ *   /login  /register  /reset-password   public only
  *   /  /lobby  /tournaments(/:id)        authenticated
  *   /shop  /profile                      authenticated
  *   /games/:gameType/:roomId             authenticated (Realtime Game Room)
@@ -30,6 +31,7 @@ export function App() {
         <Route element={<PublicOnly />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset-password" element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<RequireAuth />}>

@@ -2863,3 +2863,127 @@ a:hover {
   }
 }
 
+
+/* =========================================================================
+   RECOVERY PHRASE MODAL & PASSWORD RESET FLOW
+   ========================================================================= */
+
+.recovery-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(10, 10, 13, 0.88);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.recovery-modal {
+  width: 100%;
+  max-width: 540px;
+  padding: 2rem 1.85rem;
+  border: 1px solid var(--gold-400);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(107, 20, 36, 0.35), rgba(18, 18, 22, 0.98) 70%),
+    var(--graphite-950);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.recovery-modal__header h2 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.65rem;
+  color: var(--gold-300);
+}
+
+.recovery-phrase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  padding: 1rem;
+  border: 1px solid rgba(201, 162, 75, 0.45);
+  border-radius: var(--radius);
+  background: rgba(12, 12, 15, 0.9);
+}
+
+.recovery-word-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--graphite-700);
+  border-radius: 4px;
+  background: var(--graphite-900);
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
+}
+
+.recovery-word-chip__index {
+  color: var(--muted);
+  font-size: 0.74rem;
+  min-width: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.recovery-word-chip__word {
+  color: var(--gold-300);
+  letter-spacing: 0.03em;
+  user-select: all;
+}
+
+.recovery-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.recovery-modal__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-top: 1px solid var(--graphite-700);
+  padding-top: 1rem;
+}
+
+.recovery-modal__warning {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(201, 162, 75, 0.45);
+  border-radius: var(--radius);
+  background: rgba(201, 162, 75, 0.1);
+  color: var(--gold-300);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.recovery-textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--graphite-700);
+  border-radius: var(--radius);
+  background: var(--graphite-950);
+  color: var(--ivory);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.recovery-textarea:focus {
+  outline: none;
+  border-color: var(--gold-400);
+}
+
+@media (max-width: 560px) {
+  .recovery-phrase-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .recovery-modal__actions {
+    grid-template-columns: 1fr;
+  }
+}

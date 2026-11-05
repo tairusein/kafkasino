@@ -12,6 +12,12 @@ interface AuthContextValue {
   /** true until the stored session AND (if signed in) the profile/role have been resolved */
   loading: boolean;
   profileError: boolean;
+  /**
+   * True right after registration while the user is required to download or copy
+   * their 12-word Recovery Phrase before entering the application.
+   */
+  pendingRecoveryAck: boolean;
+  setPendingRecoveryAck: (pending: boolean) => void;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -24,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileError, setProfileError] = useState(false);
+  const [pendingRecoveryAck, setPendingRecoveryAck] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -86,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [userId, fetchUserState]);
 
   const signOut = useCallback(async () => {
+    setPendingRecoveryAck(false);
     await supabase.auth.signOut();
   }, []);
 
@@ -97,10 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       loading: initializing || (userId !== null && profile === null && !profileError),
       profileError,
+      pendingRecoveryAck,
+      setPendingRecoveryAck,
       refreshProfile,
       signOut,
     }),
-    [session, profile, isAdmin, initializing, userId, profileError, refreshProfile, signOut],
+    [
+      session,
+      profile,
+      isAdmin,
+      initializing,
+      userId,
+      profileError,
+      pendingRecoveryAck,
+      refreshProfile,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

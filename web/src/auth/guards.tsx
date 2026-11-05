@@ -3,9 +3,14 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
 const RETURN_TO_KEY = 'kafkasino.return_to';
+const AUTH_PATHS = ['/login', '/register', '/reset-password'];
+
+function isAuthPath(pathname: string): boolean {
+  return AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 function saveReturnDestination(pathname: string, search: string, hash: string) {
-  if (pathname === '/login' || pathname === '/register') return;
+  if (isAuthPath(pathname)) return;
   try {
     sessionStorage.setItem(RETURN_TO_KEY, `${pathname}${search}${hash}`);
   } catch {
@@ -26,10 +31,10 @@ function consumeReturnDestination(stateFrom?: {
     /* sessionStorage unavailable */
   }
 
-  if (stateFrom?.pathname && stateFrom.pathname !== '/login' && stateFrom.pathname !== '/register') {
+  if (stateFrom?.pathname && !isAuthPath(stateFrom.pathname)) {
     return `${stateFrom.pathname}${stateFrom.search ?? ''}${stateFrom.hash ?? ''}`;
   }
-  if (stored && !stored.startsWith('/login') && !stored.startsWith('/register')) {
+  if (stored && !AUTH_PATHS.some((p) => stored!.startsWith(p))) {
     return stored;
   }
   return '/';
@@ -89,13 +94,20 @@ export function RequireAdmin() {
   return <Outlet />;
 }
 
-/** Login / register: signed-in users are bounced to where they were heading (or home). */
+/**
+ * Login / register / reset-password:
+ * Signed-in users are bounced to where they were heading (or home),
+ * EXCEPT while `pendingRecoveryAck` is true (holding the user on `/register`
+ * until they download or copy their 12-word Recovery Phrase).
+ */
 export function PublicOnly() {
-  const { session, loading } = useAuth();
+  const { session, loading, pendingRecoveryAck } = useAuth();
   const location = useLocation();
 
-  if (loading) return <div className="app-boot-placeholder" aria-hidden="true" />;
-  if (session) {
+  if (loading && !pendingRecoveryAck) {
+    return <div className="app-boot-placeholder" aria-hidden="true" />;
+  }
+  if (session && !pendingRecoveryAck) {
     const fromState = (
       location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null
     )?.from;

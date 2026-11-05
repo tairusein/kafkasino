@@ -1,12 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
+  ?.trim()
+  .replace(/^["']|["']$/g, '');
+const rawAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
+  ?.trim()
+  .replace(/^["']|["']$/g, '');
 
-if (!url || !anonKey) {
+if (!rawUrl || !rawAnonKey) {
   throw new Error(
     'Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. Copy web/.env.example to web/.env.local and fill it in.',
   );
+}
+
+export const supabaseUrl =
+  rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+
+export const supabaseAnonKey = rawAnonKey;
+
+/**
+ * Converts a username into a deterministic internal email for Supabase Auth (`auth.users`).
+ * The user never sees or types an email address anywhere in the UI.
+ */
+export function usernameToInternalEmail(username: string): string {
+  const normalized = username
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  return `${normalized}@kafkasino.local`;
 }
 
 /**
@@ -43,7 +64,7 @@ const authStorage = {
   },
 };
 
-export const supabase = createClient(url, anonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: authStorage,
     persistSession: true,
@@ -51,4 +72,3 @@ export const supabase = createClient(url, anonKey, {
     detectSessionInUrl: true,
   },
 });
-

@@ -2,11 +2,18 @@ import { useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthShell } from '../components/AuthShell';
 import { friendlyError } from '../lib/errors';
-import { getRememberMe, setRememberMe, supabase } from '../lib/supabase';
+import {
+  getRememberMe,
+  setRememberMe,
+  supabase,
+  usernameToInternalEmail,
+} from '../lib/supabase';
+
+const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 
 export function LoginPage() {
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(getRememberMe());
   const [busy, setBusy] = useState(false);
@@ -14,11 +21,23 @@ export function LoginPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const trimmedUsername = username.trim();
+    if (!USERNAME_RE.test(trimmedUsername)) {
+      setError('Enter a valid username (3–20 letters, numbers or underscores).');
+      return;
+    }
+
     setError(null);
     setBusy(true);
     // Must be set BEFORE signing in so the session is written to the right storage.
     setRememberMe(remember);
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+
+    const internalEmail = usernameToInternalEmail(trimmedUsername);
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: internalEmail,
+      password,
+    });
+
     if (err) {
       setError(friendlyError(err));
       setBusy(false);
@@ -27,21 +46,34 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to take your seat.">
+    <AuthShell title="Welcome back" subtitle="Sign in with your username to take your seat.">
       <form className="form" onSubmit={onSubmit} noValidate={false}>
         <label className="field">
-          <span>Email</span>
+          <span>Username</span>
           <input
-            type="email"
-            autoComplete="email"
+            type="text"
+            autoComplete="username"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            minLength={3}
+            maxLength={20}
+            placeholder="Your club username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             disabled={busy}
           />
         </label>
         <label className="field">
-          <span>Password</span>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span>Password</span>
+            <Link
+              to="/reset-password"
+              state={location.state}
+              className="small"
+              style={{ color: 'var(--gold-300)' }}
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             type="password"
             autoComplete="current-password"
@@ -52,7 +84,12 @@ export function LoginPage() {
           />
         </label>
         <label className="check">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} disabled={busy} />
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            disabled={busy}
+          />
           <span>Remember me on this device</span>
         </label>
         {error && (
@@ -73,4 +110,3 @@ export function LoginPage() {
     </AuthShell>
   );
 }
-

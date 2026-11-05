@@ -4,6 +4,10 @@ const SERVER_CODES: Record<string, string> = {
   not_authenticated: 'Your session has expired. Please sign in again.',
   invalid_username: 'Usernames must be 3–20 characters: letters, numbers or underscores.',
   invalid_avatar: 'Please choose one of the avatars.',
+  invalid_recovery_phrase: 'Recovery phrase or username did not match our records.',
+  too_many_recovery_attempts:
+    'Too many failed recovery attempts. Please wait 15 minutes before trying again.',
+  password_too_short: 'Password must be at least 8 characters.',
   insufficient_funds: 'You do not have enough chips for that.',
   bonus_already_claimed: 'Today’s bonus has already been claimed.',
   already_owned: 'You already own this item.',
@@ -59,9 +63,8 @@ export function friendlyError(err: unknown): string {
   const msg = messageOf(err).trim();
   if (SERVER_CODES[msg]) return SERVER_CODES[msg];
 
-  if (/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
-  if (/email not confirmed/i.test(msg)) return 'Please confirm your email address first.';
-  if (/user already registered/i.test(msg)) return 'An account with this email already exists.';
+  if (/invalid login credentials/i.test(msg)) return 'Incorrect username or password.';
+  if (/user already registered/i.test(msg)) return 'That username is already taken. Please choose another.';
   // The signup trigger raises on a taken/invalid username; GoTrue wraps it generically.
   if (/database error saving new user/i.test(msg) || /profiles_username_lower_key/i.test(msg)) {
     return 'That username is already taken. Please choose another.';

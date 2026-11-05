@@ -1,15 +1,15 @@
 # Kafkasino — Step 1: Database & Security
 
-Apply: `supabase db reset` (local) or `supabase db push` (linked project). Then verify (local/disposable DB only):
+Apply: `supabase db reset` (local) or `supabase db push` (linked project), or run `supabase/full_schema.sql` directly in the Supabase SQL Editor. Then verify (local/disposable DB only):
 
 ```
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f supabase/tests/step1_security.sql
 ```
 
-Create the one primary admin after signing up that account once:
+Create the one primary admin after signing up that account once (accepts username or internal email):
 
 ```sql
-select public.bootstrap_admin('you@example.com');   -- SQL editor / service role only
+select public.bootstrap_admin('your_username');   -- SQL editor / service role only
 ```
 
 ## Migrations
@@ -29,6 +29,7 @@ select public.bootstrap_admin('you@example.com');   -- SQL editor / service role
 | `…11_blackjack_engine` | `game_server_secrets` (server-only shoe & hidden dealer hole card), `bj_build_shoe()`, `bj_hand_eval()`, `blackjack_start_round()`, `blackjack_place_bet()`, `blackjack_action()` (`hit`/`stand`/`double`), and 3:2 / 1:1 / push settlement via `apply_balance_delta()` |
 | `…12_roulette_slots_engine` | Enables `roulette` & `slots` in `game_catalog`; `csprng_int()` (unbiased byte rejection sampling); European Roulette (97.30% RTP: `roulette_start_round()`, `roulette_place_bets()`, `roulette_execute_spin()`); Vintage 3-Reel Slots (94.53% RTP: `slots_spin()`) |
 | `…13_scaling_games_engine` | Enables `poker`, `durak`, `chess`, & `checkers` in `game_catalog`; Texas Hold'em Poker (`poker_eval_7()`, `poker_start_hand()`, `poker_action()`, private hole cards in `game_private_states`); 36-Card Durak (`durak_start_game()`, `durak_action()`, private hands in `game_private_states`); 8×8 Chess (`chess_start_game()`, `chess_move()`); 8×8 Checkers (`checkers_start_game()`, `checkers_move()`); unified 15s `claim_turn_timeout()` across all 7 games |
+| `…14_recovery_phrase_auth` | Username + Password + 12-Word Recovery Phrase auth: `auto_confirm_kafkasino_user()` trigger on `@kafkasino.local`, server-only `user_recovery_secrets` (salted `bcrypt` via `pgcrypto`), `recovery_attempts` brute-force throttle, username-synced `update_profile()`, and `reset_password_with_recovery()` |
 
 ## Security model
 
@@ -41,11 +42,10 @@ select public.bootstrap_admin('you@example.com');   -- SQL editor / service role
 
 ## Client-visible error codes (message text)
 
-`not_authenticated`, `insufficient_funds`, `bonus_already_claimed`, `already_owned`, `item_not_found`, `item_not_owned`, `invalid_quantity`, `game_not_available`, `room_not_found`, `room_full`, `already_in_another_room`, `too_many_attempts`, `not_in_room`, `rate_limited`, `registration_closed`, `already_registered`, `tournament_full`, `not_registered`, `forbidden`.
+`not_authenticated`, `invalid_recovery_phrase`, `too_many_recovery_attempts`, `password_too_short`, `insufficient_funds`, `bonus_already_claimed`, `already_owned`, `item_not_found`, `item_not_owned`, `invalid_quantity`, `game_not_available`, `room_not_found`, `room_full`, `already_in_another_room`, `too_many_attempts`, `not_in_room`, `rate_limited`, `registration_closed`, `already_registered`, `tournament_full`, `not_registered`, `forbidden`.
 
 ## Known limitations / notes
 
 - Presence payloads are client-asserted (any member could claim another uid in the payload); the UI should derive identity from the JWT `sub`, and anything with game impact is validated server-side anyway.
 - `postgres_changes` DELETE events are not RLS-filtered by Supabase (they carry only primary keys). No sensitive data is exposed this way.
 - Avatar/card-back image files referenced by the seeds (`avatars/*.svg`, `shop-assets/…`) are created in later steps.
-

@@ -10,11 +10,12 @@ import { usePresenceReady } from '../presence/PresenceProvider';
  * and Realtime Presence handshake complete. Fades out gracefully with zero layout shift.
  */
 export function GlobalLoader() {
-  const { loading: authLoading, user } = useAuth();
+  const { loading: authLoading, user, pendingRecoveryAck } = useAuth();
   const presenceReady = usePresenceReady();
 
   // Wait for auth + profile resolution, and if signed in, initial Realtime presence connection.
-  const isBooting = authLoading || (Boolean(user) && !presenceReady);
+  // Never cover the Recovery Phrase backup modal right after registration.
+  const isBooting = !pendingRecoveryAck && (authLoading || (Boolean(user) && !presenceReady));
 
   const [visible, setVisible] = useState(true);
   const [fadingOut, setFadingOut] = useState(false);
@@ -86,4 +87,3 @@ export function GlobalLoader() {
     </div>
   );
 }
-
