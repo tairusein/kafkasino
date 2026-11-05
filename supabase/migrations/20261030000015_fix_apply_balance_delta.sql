@@ -168,3 +168,4 @@ on conflict (slug) do update
       min_players = excluded.min_players,
       max_players = excluded.max_players,
       is_enabled  = true;
+
