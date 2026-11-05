@@ -86,7 +86,8 @@ create table public.wallet_transactions (
   amount          bigint not null check (amount <> 0),
   balance_after   bigint not null check (balance_after >= 0),
   kind            text   not null check (kind in (
-                    'starting_bonus','daily_bonus','bet','win','refund','purchase',
+                    'starting_bonus','daily_bonus','bet','win','refund',
+                    'game_bet','game_win','game_refund','purchase',
                     'tournament_entry','tournament_refund','tournament_prize','admin_adjust')),
   reference_type  text,
   reference_id    text,
@@ -137,14 +138,30 @@ declare
   v_balance bigint;
   v_new     bigint;
   v_prior   bigint;
+  v_kind    text := coalesce(nullif(trim(p_kind), ''), 'bet');
 begin
   if p_amount is null or p_amount = 0 then
     raise exception 'amount_must_be_nonzero' using errcode = '22023';
   end if;
 
+  if v_kind not in (
+    'starting_bonus','daily_bonus','bet','win','refund',
+    'game_bet','game_win','game_refund','purchase',
+    'tournament_entry','tournament_refund','tournament_prize','admin_adjust'
+  ) then
+    v_kind := case when p_amount < 0 then 'bet' else 'win' end;
+  end if;
+
   select balance into v_balance from public.wallets where user_id = p_user for update;
   if not found then
-    raise exception 'wallet_not_found';
+    insert into public.wallets (user_id, balance)
+    values (p_user, public.starting_balance())
+    on conflict (user_id) do nothing;
+
+    select balance into v_balance from public.wallets where user_id = p_user for update;
+    if not found then
+      raise exception 'wallet_not_found';
+    end if;
   end if;
 
   if p_idempotency_key is not null then
@@ -164,11 +181,62 @@ begin
   insert into public.wallet_transactions
     (user_id, amount, balance_after, kind, reference_type, reference_id, idempotency_key, metadata)
   values
-    (p_user, p_amount, v_new, p_kind, p_reference_type, p_reference_id, p_idempotency_key,
+    (p_user, p_amount, v_new, v_kind, p_reference_type, p_reference_id, p_idempotency_key,
      coalesce(p_metadata, '{}'::jsonb));
 
   update public.wallets set balance = v_new, updated_at = now() where user_id = p_user;
   return v_new;
+end;
+$$;
+
+-- 6-argument overload used by all game engines (Blackjack, Roulette, Slots, Poker, Durak, Chess, Checkers)
+create or replace function public.apply_balance_delta(
+  p_user            uuid,
+  p_amount          bigint,
+  p_kind            text,
+  p_metadata        jsonb,
+  p_room_id         uuid default null,
+  p_idempotency_key text default null
+)
+returns bigint
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  return public.apply_balance_delta(
+    p_user,
+    p_amount,
+    p_kind,
+    case when p_room_id is not null then 'room' else 'game' end,
+    p_room_id::text,
+    p_idempotency_key,
+    coalesce(p_metadata, '{}'::jsonb)
+  );
+end;
+$$;
+
+-- 3-argument convenience overload for authenticated callers
+create or replace function public.apply_balance_delta(
+  p_amount   bigint,
+  p_kind     text  default 'bet',
+  p_metadata jsonb default '{}'::jsonb
+)
+returns bigint
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := public.require_uid();
+begin
+  return public.apply_balance_delta(
+    v_uid,
+    p_amount,
+    p_kind,
+    'game',
+    null,
+    null,
+    coalesce(p_metadata, '{}'::jsonb)
+  );
 end;
 $$;
 

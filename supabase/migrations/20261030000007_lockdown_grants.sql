@@ -79,8 +79,14 @@ grant execute on function
 -- ---------- Functions: server-only (service_role / postgres / supabase_auth_admin) --
 grant execute on function
   public.apply_balance_delta(uuid, bigint, text, text, text, text, jsonb),
+  public.apply_balance_delta(uuid, bigint, text, jsonb, uuid, text),
+  public.apply_balance_delta(bigint, text, jsonb),
   public.consume_emote_charge(uuid, uuid),
   public.force_afk(uuid, uuid),
   public.bootstrap_admin(text),
   public.handle_new_user()
   to postgres, service_role, supabase_auth_admin;
+
+grant execute on function
+  public.apply_balance_delta(bigint, text, jsonb)
+  to authenticated;

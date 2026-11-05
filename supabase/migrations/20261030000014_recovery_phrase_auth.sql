@@ -440,8 +440,152 @@ $$;
 revoke all on function public.bootstrap_admin(text) from public, anon, authenticated;
 grant execute on function public.bootstrap_admin(text) to postgres, service_role;
 
--- ---------- 8. Crucial Grants for Supabase Auth (`supabase_auth_admin`) ------
+-- ---------- 8. Ensure `apply_balance_delta` Overloads & Game Catalog ---------
+alter table public.wallet_transactions
+  drop constraint if exists wallet_transactions_kind_check;
+
+alter table public.wallet_transactions
+  add constraint wallet_transactions_kind_check
+  check (kind in (
+    'starting_bonus','daily_bonus','bet','win','refund',
+    'game_bet','game_win','game_refund','purchase',
+    'tournament_entry','tournament_refund','tournament_prize','admin_adjust'
+  ));
+
+create or replace function public.apply_balance_delta(
+  p_user            uuid,
+  p_amount          bigint,
+  p_kind            text,
+  p_reference_type  text  default null,
+  p_reference_id    text  default null,
+  p_idempotency_key text  default null,
+  p_metadata        jsonb default '{}'::jsonb
+)
+returns bigint
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_balance bigint;
+  v_new     bigint;
+  v_prior   bigint;
+  v_kind    text := coalesce(nullif(trim(p_kind), ''), 'bet');
+begin
+  if p_amount is null or p_amount = 0 then
+    raise exception 'amount_must_be_nonzero' using errcode = '22023';
+  end if;
+
+  if v_kind not in (
+    'starting_bonus','daily_bonus','bet','win','refund',
+    'game_bet','game_win','game_refund','purchase',
+    'tournament_entry','tournament_refund','tournament_prize','admin_adjust'
+  ) then
+    v_kind := case when p_amount < 0 then 'bet' else 'win' end;
+  end if;
+
+  select balance into v_balance from public.wallets where user_id = p_user for update;
+  if not found then
+    insert into public.wallets (user_id, balance)
+    values (p_user, public.starting_balance())
+    on conflict (user_id) do nothing;
+
+    select balance into v_balance from public.wallets where user_id = p_user for update;
+    if not found then
+      raise exception 'wallet_not_found';
+    end if;
+  end if;
+
+  if p_idempotency_key is not null then
+    select balance_after into v_prior
+      from public.wallet_transactions
+     where idempotency_key = p_idempotency_key and user_id = p_user;
+    if found then
+      return v_prior;
+    end if;
+  end if;
+
+  v_new := v_balance + p_amount;
+  if v_new < 0 then
+    raise exception 'insufficient_funds';
+  end if;
+
+  insert into public.wallet_transactions
+    (user_id, amount, balance_after, kind, reference_type, reference_id, idempotency_key, metadata)
+  values
+    (p_user, p_amount, v_new, v_kind, p_reference_type, p_reference_id, p_idempotency_key,
+     coalesce(p_metadata, '{}'::jsonb));
+
+  update public.wallets set balance = v_new, updated_at = now() where user_id = p_user;
+  return v_new;
+end;
+$$;
+
+create or replace function public.apply_balance_delta(
+  p_user            uuid,
+  p_amount          bigint,
+  p_kind            text,
+  p_metadata        jsonb,
+  p_room_id         uuid default null,
+  p_idempotency_key text default null
+)
+returns bigint
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  return public.apply_balance_delta(
+    p_user,
+    p_amount,
+    p_kind,
+    case when p_room_id is not null then 'room' else 'game' end,
+    p_room_id::text,
+    p_idempotency_key,
+    coalesce(p_metadata, '{}'::jsonb)
+  );
+end;
+$$;
+
+create or replace function public.apply_balance_delta(
+  p_amount   bigint,
+  p_kind     text  default 'bet',
+  p_metadata jsonb default '{}'::jsonb
+)
+returns bigint
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := public.require_uid();
+begin
+  return public.apply_balance_delta(
+    v_uid,
+    p_amount,
+    p_kind,
+    'game',
+    null,
+    null,
+    coalesce(p_metadata, '{}'::jsonb)
+  );
+end;
+$$;
+
+insert into public.game_catalog (slug, name, min_players, max_players, is_enabled) values
+  ('blackjack', 'Blackjack',      1, 5, true),
+  ('roulette',  'Roulette',       1, 8, true),
+  ('slots',     'Slots',          1, 1, true),
+  ('poker',     'Texas Hold''em', 2, 6, true),
+  ('durak',     'Durak',          2, 4, true),
+  ('chess',     'Chess',          2, 2, true),
+  ('checkers',  'Checkers',       2, 2, true)
+on conflict (slug) do update
+  set name        = excluded.name,
+      min_players = excluded.min_players,
+      max_players = excluded.max_players,
+      is_enabled  = true;
+
+-- ---------- 9. Crucial Grants for Supabase Auth (`supabase_auth_admin`) ------
 grant usage on schema public to postgres, anon, authenticated, service_role, supabase_auth_admin;
 grant all on all tables    in schema public to postgres, service_role, supabase_auth_admin;
 grant all on all sequences in schema public to postgres, service_role, supabase_auth_admin;
 grant execute on all functions in schema public to postgres, service_role, supabase_auth_admin;
+grant execute on function public.apply_balance_delta(bigint, text, jsonb) to authenticated;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSound } from '../audio/SoundProvider';
+import { useI18n } from '../i18n/I18nProvider';
 import { formatChips } from '../lib/format';
 import { DEFAULT_CARD_BACK_URL, EMOTE_SPECS, resolveCardBackUrl } from '../lib/shop';
 import type {
@@ -22,7 +23,6 @@ import { CasinoChipSvg } from './PlayingCardSvg';
 
 const CHIP_DENOMINATIONS = [50, 100, 250, 500, 1000, 5000] as const;
 
-/** Authentic 37-pocket European single-zero wheel sequence (clockwise from 0). */
 const EUROPEAN_WHEEL_ORDER: readonly number[] = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29,
   7, 28, 12, 35, 3, 26,
@@ -98,10 +98,6 @@ function formatBetLabel(item: Pick<RouletteBetItem, 'kind' | 'number'>): string 
   }
 }
 
-/**
- * Pure vector (SVG) 37-pocket European Roulette wheel.
- * Smoothly rotates the rotor so the winning pocket lands directly beneath the top gold marker (12 o'clock).
- */
 function EuropeanRouletteWheelSvg({
   rotationDeg,
   winningNumber,
@@ -117,8 +113,8 @@ function EuropeanRouletteWheelSvg({
     <div className="rl-wheel-wrap">
       <svg
         viewBox="0 0 320 320"
-        width={268}
-        height={268}
+        width={276}
+        height={276}
         className="rl-wheel-svg"
         role="img"
         aria-label="European single-zero roulette wheel"
@@ -226,6 +222,7 @@ export function RouletteTable({
 }: RouletteTableProps) {
   const { balance } = useWallet();
   const { sound } = useSound();
+  const { t } = useI18n();
 
   const tableMinBet = Math.max(room.min_bet || 0, 50);
   const [selectedChip, setSelectedChip] = useState<number>(() => (tableMinBet >= 500 ? 500 : 100));
@@ -248,7 +245,6 @@ export function RouletteTable({
     [gameState?.state?.history],
   );
 
-  // Trigger wheel spin animation & roulette ball audio when a new round settles.
   useEffect(() => {
     if (phase === 'settled' && winningNumber !== null && roundNumber > prevRoundRef.current) {
       prevRoundRef.current = roundNumber;
@@ -257,7 +253,7 @@ export function RouletteTable({
 
       setWheelSpinning(true);
       setWheelDeg((prev) => {
-        const base = Math.ceil(prev / 360) * 360 + 1440; // +4 full revolutions
+        const base = Math.ceil(prev / 360) * 360 + 1440;
         return base - pocketAngle;
       });
 
@@ -351,7 +347,6 @@ export function RouletteTable({
     setDraftBets([]);
   }
 
-  // Build the 3 rows × 12 columns of numbers (top row: 3,6..36; mid: 2,5..35; bot: 1,4..34)
   const rows: number[][] = [
     Array.from({ length: 12 }, (_, i) => (i + 1) * 3),
     Array.from({ length: 12 }, (_, i) => i * 3 + 2),
@@ -359,20 +354,18 @@ export function RouletteTable({
   ];
 
   return (
-    <section className="table-felt rl-felt" aria-label="European Roulette table">
+    <section className="table-felt casino-oval-felt rl-felt" aria-label="European Roulette table">
       {/* Top Bar: RTP Info & Recent Winning Numbers Marquee */}
       <div className="rl-top-bar">
         <div>
-          <span className="eyebrow">European Single-Zero Wheel · 97.30% RTP (2.70% House Edge)</span>
-          <div className="muted small">
-            Straight Up 35:1 · Dozens &amp; Columns 2:1 · Even-Money Outside Bets 1:1
-          </div>
+          <span className="eyebrow">{t('rl.eyebrow')}</span>
+          <div className="muted small">{t('rl.payouts')}</div>
         </div>
 
         <div className="rl-history-strip" aria-label="Recent winning numbers">
-          <span className="muted small">Last Spins:</span>
+          <span className="muted small">{t('rl.lastSpins')}</span>
           {history.length === 0 ? (
-            <span className="muted small">No spins yet</span>
+            <span className="muted small">{t('rl.noSpins')}</span>
           ) : (
             history.map((h, i) => (
               <span
@@ -399,14 +392,16 @@ export function RouletteTable({
 
           <div className="rl-result-box">
             {wheelSpinning ? (
-              <span className="gold-text">Ball rolling on the track…</span>
+              <span className="gold-text">{t('rl.ballRolling')}</span>
             ) : winningNumber !== null && winningColor ? (
               <div className="rl-winning-callout">
                 <span className={`rl-history-pill rl-history-pill--${winningColor} rl-history-pill--lg tabular`}>
                   {winningNumber}
                 </span>
                 <div>
-                  <div className="eyebrow">Winning Pocket · Spin #{roundNumber}</div>
+                  <div className="eyebrow">
+                    {t('rl.winningPocket')} #{roundNumber}
+                  </div>
                   <strong>
                     {winningNumber} {winningColor.toUpperCase()}
                     {winningNumber > 0 ? (winningNumber % 2 === 0 ? ' · EVEN' : ' · ODD') : ' · ZERO'}
@@ -414,7 +409,7 @@ export function RouletteTable({
                 </div>
               </div>
             ) : (
-              <span className="muted small">Place chips on the board to spin the wheel.</span>
+              <span className="muted small">{t('rl.placeChipsPrompt')}</span>
             )}
           </div>
         </div>
@@ -553,7 +548,7 @@ export function RouletteTable({
                   data-silent
                   title={`Select ${formatChips(val)} chip`}
                 >
-                  <CasinoChipSvg value={val} size={44} />
+                  <CasinoChipSvg value={val} size={46} />
                 </button>
               ))}
             </div>
@@ -561,10 +556,11 @@ export function RouletteTable({
             <div className="bj-wager-bar">
               <div className="bj-wager-display">
                 <span className="muted small">
-                  Current Slip ({draftBets.length} bet{draftBets.length === 1 ? '' : 's'} · Min{' '}
-                  {formatChips(tableMinBet)})
+                  {t('bj.yourWager')} ({t('room.min')} {formatChips(tableMinBet)})
                 </span>
-                <strong className="bj-wager-display__amount tabular">{formatChips(draftTotal)} Chips</strong>
+                <strong className="bj-wager-display__amount tabular">
+                  {formatChips(draftTotal)} {t('room.chips')}
+                </strong>
               </div>
 
               <div className="row">
@@ -575,7 +571,7 @@ export function RouletteTable({
                   disabled={draftBets.length === 0 || actionBusy || wheelSpinning}
                   data-silent
                 >
-                  Undo
+                  {t('rl.undo')}
                 </button>
                 <button
                   type="button"
@@ -584,7 +580,7 @@ export function RouletteTable({
                   disabled={draftBets.length === 0 || actionBusy || wheelSpinning}
                   data-silent
                 >
-                  Clear
+                  {t('rl.clear')}
                 </button>
                 <button
                   type="button"
@@ -598,7 +594,7 @@ export function RouletteTable({
                   }
                   data-silent
                 >
-                  2× Slip
+                  {t('rl.doubleSlip')}
                 </button>
                 <button
                   type="button"
@@ -613,10 +609,10 @@ export function RouletteTable({
                   }
                 >
                   {actionBusy || wheelSpinning
-                    ? 'Spinning…'
+                    ? t('rl.spinning')
                     : phase === 'betting'
-                      ? `Lock In Bets (${formatChips(draftTotal)})`
-                      : `Spin Wheel · Bet ${formatChips(draftTotal)}`}
+                      ? `${t('rl.lockInBets')} (${formatChips(draftTotal)})`
+                      : `${t('rl.spinWheel')} ${formatChips(draftTotal)}`}
                 </button>
                 {seats.length > 1 && (phase === 'lobby' || phase === 'settled') && (
                   <button
@@ -625,7 +621,7 @@ export function RouletteTable({
                     onClick={() => void onStartRound()}
                     disabled={actionBusy || wheelSpinning}
                   >
-                    Open Table Betting (15s)
+                    {t('room.openTableBetting')}
                   </button>
                 )}
               </div>
@@ -640,9 +636,9 @@ export function RouletteTable({
           <div className="turn-spotlight">
             <div className="turn-spotlight__title">
               {isMyTurn ? (
-                <span className="gold-text">Your Turn to Lock In Roulette Bets</span>
+                <span className="gold-text">{t('bj.yourTurnBet')}</span>
               ) : (
-                <span>Awaiting {turnPlayer.username}&apos;s Bets</span>
+                <span>{t('bj.awaitingBet', { player: turnPlayer.username })}</span>
               )}
               <span className={`turn-clock tabular${Number(turnSeconds) <= 5 ? ' turn-clock--urgent' : ''}`}>
                 {turnSeconds}s
@@ -667,23 +663,25 @@ export function RouletteTable({
         >
           {myTicket.payout > 0 ? (
             <>
-              <strong>ROULETTE PAYOUT: {formatChips(myTicket.payout)} CHIPS!</strong>
+              <strong>
+                ROULETTE PAYOUT: {formatChips(myTicket.payout)} {t('room.chips').toUpperCase()}!
+              </strong>
               <span>
-                Wagered {formatChips(myTicket.total_bet)} · Net result:{' '}
-                {myTicket.net >= 0 ? `+${formatChips(myTicket.net)}` : formatChips(myTicket.net)} chips
+                Wagered {formatChips(myTicket.total_bet)} · Net:{' '}
+                {myTicket.net >= 0 ? `+${formatChips(myTicket.net)}` : formatChips(myTicket.net)}
               </span>
             </>
           ) : (
             <>
               <strong>NO WINNING BETS ON #{winningNumber}</strong>
-              <span>Wager of {formatChips(myTicket.total_bet)} chips collected by the House.</span>
+              <span>-{formatChips(myTicket.total_bet)} {t('room.chips')}</span>
             </>
           )}
         </div>
       )}
 
       {/* Seated Players & Tickets */}
-      <div className="seats-grid">
+      <div className="seats-grid seats-grid--arc">
         {seats.map((seat) => {
           const isTurn = gameState?.turn_user_id === seat.user_id;
           const isMe = currentUserId === seat.user_id;
@@ -724,13 +722,15 @@ export function RouletteTable({
               )}
 
               <div className="seat-card__top">
-                <span className="muted small tabular">Seat #{seat.seat + 1}</span>
+                <span className="muted small tabular">
+                  {t('room.seat')} #{seat.seat + 1}
+                </span>
                 <div className="row">
-                  {room.host_id === seat.user_id && <span className="badge">Host</span>}
+                  {room.host_id === seat.user_id && <span className="badge">{t('room.host')}</span>}
                   {seat.status === 'afk' ? (
                     <span className="badge badge--timeout">AFK</span>
                   ) : isTurn ? (
-                    <span className="badge badge--open">Betting</span>
+                    <span className="badge badge--open">{t('room.acting')}</span>
                   ) : null}
                 </div>
               </div>
@@ -739,12 +739,12 @@ export function RouletteTable({
                 <Avatar avatarId={seat.avatar_id} userId={seat.user_id} size={46} />
                 <div className="seat-card__meta">
                   <strong className="seat-card__name">
-                    {seat.username} {isMe ? '(You)' : ''}
+                    {seat.username} {isMe ? t('room.you') : ''}
                   </strong>
                   <span className="muted small">
                     {tkt && tkt.total_bet > 0
-                      ? `Wager: ${formatChips(tkt.total_bet)} Chips`
-                      : 'Ready at wheel'}
+                      ? `${formatChips(tkt.total_bet)} ${t('room.chips')}`
+                      : t('room.tableReady')}
                   </span>
                 </div>
                 <img
@@ -774,8 +774,8 @@ export function RouletteTable({
                     <div className="bj-seat-outcome">
                       <span className={`badge ${tkt.payout > 0 ? 'badge--bj-win' : 'badge--timeout'}`}>
                         {tkt.payout > 0
-                          ? `Won ${formatChips(tkt.payout)} (Net +${formatChips(tkt.net)})`
-                          : `Lost ${formatChips(tkt.total_bet)}`}
+                          ? `+${formatChips(tkt.payout)} (Net +${formatChips(tkt.net)})`
+                          : `-${formatChips(tkt.total_bet)}`}
                       </span>
                     </div>
                   )}
@@ -788,7 +788,7 @@ export function RouletteTable({
                   className="btn btn--ghost btn--sm seat-target-btn"
                   onClick={() => void onFireInteractive(seat.user_id)}
                 >
-                  🎯 Target with Emote
+                  {t('room.targetEmote')}
                 </button>
               )}
             </div>
@@ -798,4 +798,3 @@ export function RouletteTable({
     </section>
   );
 }
-

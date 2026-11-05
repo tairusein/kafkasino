@@ -2987,3 +2987,400 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =========================================================================
+   MULTI-LANGUAGE SWITCHER, INTERACTIVE LOBBY CARDS, COMPACT FLOATING CHAT
+   & LUXURY CASINO TABLE OVERHAUL FOR ALL 7 GAMES
+   ========================================================================= */
+
+/* Language Switcher (EN | RU | DE) */
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid rgba(201, 162, 75, 0.48);
+  border-radius: 999px;
+  background: var(--graphite-950);
+  gap: 2px;
+}
+
+.lang-switcher__btn {
+  border: none;
+  background: transparent;
+  color: var(--ivory-dim);
+  font: 700 0.72rem var(--font-sans);
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lang-switcher__btn:hover {
+  color: var(--gold-300);
+}
+
+.lang-switcher__btn.is-active {
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  color: #161206;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.auth-card__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.auth-card__top-row .brand--large {
+  font-size: 2.1rem;
+  text-align: left;
+}
+
+/* Interactive Lobby Game Cards */
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.game-card--interactive {
+  position: relative;
+  padding: 1.15rem 1.2rem;
+  border: 1px solid rgba(201, 162, 75, 0.36);
+  border-top: 2px solid var(--gold-500);
+  border-radius: 10px;
+  background:
+    radial-gradient(240px 140px at 85% 0%, rgba(130, 26, 46, 0.38), transparent 72%),
+    linear-gradient(180deg, #1d1d24 0%, #141419 100%);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.48);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.game-card--interactive:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold-300);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.65), 0 0 18px rgba(201, 162, 75, 0.22);
+}
+
+.game-card__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.game-card__emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 162, 75, 0.55);
+  background: rgba(16, 16, 19, 0.85);
+  color: var(--gold-300);
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 10px rgba(201, 162, 75, 0.18);
+}
+
+.game-card__live-pill {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 204, 113, 0.5);
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--online);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.game-card__footer {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(201, 162, 75, 0.18);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.game-card__open-btn {
+  width: 100%;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.lobby-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Maximized Room Layout & Compact Emote Strip */
+.room-shell {
+  width: 100%;
+}
+
+.room-layout--maximized {
+  display: block;
+  width: 100%;
+}
+
+.emote-dock--compact {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid rgba(201, 162, 75, 0.4);
+  background: rgba(20, 20, 25, 0.94);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Compact Collapsible Floating Chat Drawer */
+.room-chat-floating {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 90;
+}
+
+.room-chat-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--gold-400);
+  background: linear-gradient(180deg, #221a1f 0%, #141418 100%);
+  color: var(--gold-300);
+  font: 600 0.86rem var(--font-sans);
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), 0 0 14px rgba(201, 162, 75, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.room-chat-fab:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-300);
+}
+
+.room-chat-fab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--burgundy-500);
+  border: 1px solid var(--gold-300);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.room-chat--compact {
+  width: 315px;
+  height: 360px;
+  border: 1px solid var(--gold-400);
+  border-top: 2px solid var(--gold-300);
+  border-radius: 10px;
+  background: rgba(18, 18, 23, 0.96);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.85);
+}
+
+.room-chat__close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--graphite-600);
+  background: var(--graphite-950);
+  color: var(--ivory-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.room-chat__close-btn:hover {
+  border-color: var(--gold-400);
+  color: var(--gold-300);
+}
+
+.room-chat__quick-emotes {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0.3rem 0.6rem;
+  border-top: 1px solid var(--graphite-700);
+  background: rgba(12, 12, 15, 0.8);
+}
+
+.chat-mini-emote-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.chat-mini-emote-btn:hover {
+  transform: scale(1.2);
+  background: rgba(201, 162, 75, 0.15);
+}
+
+/* Luxury High-End Casino Table Felt & Rail Architecture */
+.casino-oval-felt {
+  position: relative;
+  padding: 2rem 2.2rem;
+  border-radius: 36px;
+  border: 10px solid #241519;
+  box-shadow:
+    inset 0 0 0 2px rgba(217, 184, 99, 0.62),
+    inset 0 0 75px rgba(0, 0, 0, 0.85),
+    0 24px 60px rgba(0, 0, 0, 0.8);
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(22, 88, 58, 0.58) 0%, rgba(14, 48, 34, 0.88) 55%, rgba(12, 18, 16, 0.98) 100%),
+    #0d1f17;
+}
+
+.poker-felt {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(24, 94, 65, 0.65) 0%, rgba(12, 46, 33, 0.92) 60%, rgba(10, 16, 14, 0.98) 100%),
+    #0b1d15;
+}
+
+.rl-felt {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(124, 24, 43, 0.52) 0%, rgba(20, 56, 40, 0.85) 58%, rgba(12, 14, 18, 0.98) 100%),
+    #111518;
+}
+
+.durak-felt {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(118, 24, 44, 0.58) 0%, rgba(36, 15, 23, 0.94) 65%, rgba(14, 12, 16, 0.98) 100%),
+    #140d11;
+}
+
+.board-felt {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(92, 58, 28, 0.38) 0%, rgba(22, 20, 26, 0.95) 68%, rgba(12, 12, 15, 0.99) 100%),
+    #121216;
+}
+
+.casino-dealer-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid var(--gold-400);
+  background: linear-gradient(180deg, #2b1d0d, #171006);
+  color: var(--gold-300);
+  font: 700 0.68rem var(--font-sans);
+  letter-spacing: 0.14em;
+}
+
+.casino-dealer-tray {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 75, 0.45);
+  background: #0c0c0f;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+.casino-dealer-tray__tube {
+  width: 22px;
+  height: 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    #c9a24b 0px,
+    #c9a24b 3px,
+    #1b1b22 3px,
+    #1b1b22 5px
+  );
+  opacity: 0.85;
+}
+
+.casino-betting-circle {
+  margin: 0.35rem auto 0.15rem;
+  width: 96px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1.5px dashed rgba(217, 184, 99, 0.48);
+  background: rgba(12, 16, 14, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: rgba(232, 207, 143, 0.68);
+}
+
+.seats-grid--arc {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+
+.poker-pot-box {
+  border-color: var(--gold-400);
+  background: rgba(16, 16, 20, 0.92);
+  padding: 0.45rem 1rem;
+}
+
+/* Chess Piece Typography & Contrast */
+.chess-glyph {
+  font-size: 2.35rem;
+  line-height: 1;
+  user-select: none;
+  transition: transform 0.12s ease;
+}
+
+.chess-glyph--white {
+  color: #fdf8ec;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.85),
+    0 0 2px #000;
+}
+
+.chess-glyph--black {
+  color: #191920;
+  text-shadow:
+    0 1px 2px rgba(255, 255, 255, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
+@media (max-width: 760px) {
+  .emote-dock--compact {
+    grid-template-columns: 1fr;
+  }
+  .casino-oval-felt {
+    padding: 1.15rem;
+    border-width: 5px;
+    border-radius: 18px;
+  }
+  .room-chat--compact {
+    width: calc(100vw - 2rem);
+    height: 320px;
+  }
+}
+
+.app-main {
+  max-width: 1380px;
+  padding: 1.5rem 1.5rem 3.5rem;
+}

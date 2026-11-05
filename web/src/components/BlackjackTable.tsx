@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSound } from '../audio/SoundProvider';
+import { useI18n } from '../i18n/I18nProvider';
 import { formatChips } from '../lib/format';
 import { DEFAULT_CARD_BACK_URL, EMOTE_SPECS, resolveCardBackUrl } from '../lib/shop';
 import type {
@@ -90,6 +91,7 @@ export function BlackjackTable({
 }: BlackjackTableProps) {
   const { balance } = useWallet();
   const { sound } = useSound();
+  const { t } = useI18n();
 
   const tableMinBet = Math.max(room.min_bet || 0, 50);
   const [wager, setWager] = useState<number>(tableMinBet);
@@ -112,9 +114,6 @@ export function BlackjackTable({
   const turnProgressPct =
     turnRemainingMs !== null ? Math.min(100, Math.max(0, (turnRemainingMs / 15000) * 100)) : 0;
 
-  // Determine whether the current user can place a bet right now:
-  // Either a round hasn't started yet ('lobby', 'settled', 'awaiting_players')
-  // OR we are in 'betting' and the user hasn't placed their bet yet.
   const canPlaceBet =
     Boolean(currentUserId) &&
     (phase === 'lobby' ||
@@ -144,12 +143,13 @@ export function BlackjackTable({
   }
 
   return (
-    <section className="table-felt bj-felt" aria-label="Blackjack table">
-      {/* 1. Dealer Station & 6-Deck Shoe */}
+    <section className="table-felt casino-oval-felt bj-felt" aria-label="Blackjack table">
+      {/* Luxury Casino Chip Tray & Dealer Station */}
       <div className="bj-dealer-zone">
         <div className="bj-dealer-head">
           <div className="row">
-            <span className="eyebrow">House Dealer · Stands on All 17s</span>
+            <span className="casino-dealer-badge">CROUPIER</span>
+            <span className="eyebrow">{t('bj.dealerRules')}</span>
             {dealer && dealer.cards.length > 0 && (
               <span
                 className={`badge tabular ${
@@ -161,19 +161,29 @@ export function BlackjackTable({
                 }`}
               >
                 {dealer.hole_hidden
-                  ? `${dealer.total} + Hidden`
+                  ? `${dealer.total} + ?`
                   : formatHandTotal(dealer.total, dealer.is_soft, dealer.is_blackjack, dealer.is_bust)}
               </span>
             )}
           </div>
 
-          <div className="bj-shoe-pill" title="Authoritative 6-deck server shoe (stored in game_server_secrets)">
+          <div className="casino-dealer-tray" aria-hidden="true">
+            <span className="casino-dealer-tray__tube" />
+            <span className="casino-dealer-tray__tube" />
+            <span className="casino-dealer-tray__tube" />
+            <span className="casino-dealer-tray__tube" />
+            <span className="casino-dealer-tray__tube" />
+          </div>
+
+          <div className="bj-shoe-pill" title="Authoritative 6-deck server shoe">
             <svg viewBox="0 0 28 20" width="22" height="16" aria-hidden="true">
               <rect x="2" y="3" width="24" height="14" rx="2" fill="#23262e" stroke="#c9a24b" strokeWidth="1.4" />
               <line x1="7" y1="3" x2="7" y2="17" stroke="#c9a24b" strokeWidth="1" />
               <line x1="12" y1="3" x2="12" y2="17" stroke="#c9a24b" strokeWidth="1" />
             </svg>
-            <span className="muted small tabular">Shoe: {shoeRemaining} / 312</span>
+            <span className="muted small tabular">
+              {t('bj.shoe')}: {shoeRemaining} / 312
+            </span>
           </div>
         </div>
 
@@ -184,8 +194,8 @@ export function BlackjackTable({
                 <PlayingCardSvg
                   key={`dealer-${idx}-${c.rank}-${c.suit}`}
                   card={c}
-                  width={84}
-                  height={118}
+                  width={90}
+                  height={126}
                   className="bj-card-anim"
                 />
               ))}
@@ -194,45 +204,42 @@ export function BlackjackTable({
                   key="dealer-hole-hidden"
                   hidden
                   cardBackUrl={DEFAULT_CARD_BACK_URL}
-                  width={84}
-                  height={118}
+                  width={90}
+                  height={126}
                   className="bj-card-anim"
                 />
               )}
             </>
           ) : (
             <div className="bj-empty-cards">
-              <PlayingCardSvg hidden cardBackUrl={DEFAULT_CARD_BACK_URL} width={76} height={106} />
-              <PlayingCardSvg hidden cardBackUrl={DEFAULT_CARD_BACK_URL} width={76} height={106} />
-              <span className="muted small">Place your wager below to deal the next hand.</span>
+              <PlayingCardSvg hidden cardBackUrl={DEFAULT_CARD_BACK_URL} width={78} height={110} />
+              <PlayingCardSvg hidden cardBackUrl={DEFAULT_CARD_BACK_URL} width={78} height={110} />
+              <span className="muted small">{t('bj.placeWagerPrompt')}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* 2. Center Felt Ribbon, 15s Turn Clock & Round Banner */}
+      {/* 2. Center Felt Ribbon, Curved Felt Arch & 15s Turn Clock */}
       <div className="table-felt__center bj-center-ribbon">
-        <div className="bj-rules-arch">
-          BLACKJACK PAYS 3 TO 2 · DEALER MUST STAND ON ALL 17 · 6-DECK SHOE
-        </div>
+        <div className="bj-rules-arch">{t('bj.feltRibbon')}</div>
 
         <div className="row row--center">
-          <span className="badge">
+          <span className="badge badge--open">
             {phase === 'lobby'
-              ? 'Table Ready'
+              ? t('room.tableReady')
               : phase === 'betting'
-                ? `Hand #${roundNumber} · Betting Open`
+                ? `${t('room.hand')} #${roundNumber} · ${t('room.bettingOpen')}`
                 : phase === 'playing'
-                  ? `Hand #${roundNumber} · In Play`
-                  : `Hand #${roundNumber} · Settled`}
+                  ? `${t('room.hand')} #${roundNumber} · ${t('room.inPlay')}`
+                  : `${t('room.hand')} #${roundNumber} · ${t('room.settled')}`}
           </span>
 
           {lastAction && (
             <span className="last-action-pill">
-              <span className="muted small">Last:</span>{' '}
               <strong>{lastAction.type.toUpperCase()}</strong>
               {lastAction.forced_by_timeout && (
-                <span className="badge badge--timeout">15s Timeout → AFK</span>
+                <span className="badge badge--timeout">15s → AFK</span>
               )}
             </span>
           )}
@@ -244,13 +251,13 @@ export function BlackjackTable({
             <div className="turn-spotlight__title">
               {isMyTurn ? (
                 <span className="gold-text">
-                  {phase === 'betting' ? 'Your Turn to Place Bet' : 'Your Turn to Act (Hit / Stand / Double)'}
+                  {phase === 'betting' ? t('bj.yourTurnBet') : t('bj.yourTurnAct')}
                 </span>
               ) : (
                 <span>
                   {phase === 'betting'
-                    ? `Awaiting ${turnPlayer.username}'s Bet`
-                    : `${turnPlayer.username} is Acting`}
+                    ? t('bj.awaitingBet', { player: turnPlayer.username })
+                    : t('bj.playerActing', { player: turnPlayer.username })}
                 </span>
               )}
               <span className={`turn-clock tabular${Number(turnSeconds) <= 5 ? ' turn-clock--urgent' : ''}`}>
@@ -276,7 +283,7 @@ export function BlackjackTable({
               <>
                 <strong>NATURAL BLACKJACK!</strong>
                 <span>
-                  Paid 3:2 — Returned {formatChips(myHand.payout)} Chips (+{formatChips(myHand.net)} net profit)
+                  3:2 — +{formatChips(myHand.payout)} {t('room.chips')} (+{formatChips(myHand.net)})
                 </span>
               </>
             )}
@@ -284,26 +291,34 @@ export function BlackjackTable({
               <>
                 <strong>HAND WON!</strong>
                 <span>
-                  Returned {formatChips(myHand.payout)} Chips (+{formatChips(myHand.net)} net profit)
+                  +{formatChips(myHand.payout)} {t('room.chips')} (+{formatChips(myHand.net)})
                 </span>
               </>
             )}
             {myHand.outcome === 'push' && (
               <>
                 <strong>PUSH — STANDOFF</strong>
-                <span>Your {formatChips(myHand.payout)} chip wager has been refunded to your balance.</span>
+                <span>
+                  {formatChips(myHand.payout)} {t('room.chips')} refunded.
+                </span>
               </>
             )}
             {myHand.outcome === 'bust' && (
               <>
-                <strong>HAND BUSTED ({myHand.total})</strong>
-                <span>Wager of {formatChips(myHand.bet)} chips lost to the House.</span>
+                <strong>BUST ({myHand.total})</strong>
+                <span>
+                  -{formatChips(myHand.bet)} {t('room.chips')}
+                </span>
               </>
             )}
             {myHand.outcome === 'lose' && (
               <>
-                <strong>DEALER WINS ({dealer?.total ?? 0} vs {myHand.total})</strong>
-                <span>Wager of {formatChips(myHand.bet)} chips lost to the House.</span>
+                <strong>
+                  DEALER WINS ({dealer?.total ?? 0} vs {myHand.total})
+                </strong>
+                <span>
+                  -{formatChips(myHand.bet)} {t('room.chips')}
+                </span>
               </>
             )}
           </div>
@@ -320,18 +335,22 @@ export function BlackjackTable({
                   className="bj-chip-btn"
                   onClick={() => addChipToWager(val)}
                   disabled={actionBusy || (balance !== null && balance < val)}
-                  title={`Add ${formatChips(val)} chips to wager`}
+                  title={`+${formatChips(val)}`}
                   data-silent
                 >
-                  <CasinoChipSvg value={val} size={46} />
+                  <CasinoChipSvg value={val} size={50} />
                 </button>
               ))}
             </div>
 
             <div className="bj-wager-bar">
               <div className="bj-wager-display">
-                <span className="muted small">Your Wager (Min {formatChips(tableMinBet)})</span>
-                <strong className="bj-wager-display__amount tabular">{formatChips(wager)} Chips</strong>
+                <span className="muted small">
+                  {t('bj.yourWager')} ({t('room.min')} {formatChips(tableMinBet)})
+                </span>
+                <strong className="bj-wager-display__amount tabular">
+                  {formatChips(wager)} {t('room.chips')}
+                </strong>
               </div>
 
               <div className="row">
@@ -345,7 +364,7 @@ export function BlackjackTable({
                   disabled={actionBusy || wager === tableMinBet}
                   data-silent
                 >
-                  Min ({formatChips(tableMinBet)})
+                  {t('room.min')} ({formatChips(tableMinBet)})
                 </button>
                 <button
                   type="button"
@@ -360,7 +379,7 @@ export function BlackjackTable({
                   disabled={actionBusy || (balance !== null && wager * 2 > balance)}
                   data-silent
                 >
-                  2× Wager
+                  {t('room.doubleWager')}
                 </button>
                 <button
                   type="button"
@@ -369,10 +388,10 @@ export function BlackjackTable({
                   disabled={actionBusy || insufficientForWager || wager < tableMinBet}
                 >
                   {actionBusy
-                    ? 'Dealing…'
+                    ? t('bj.dealing')
                     : phase === 'betting'
-                      ? `Confirm Bet · ${formatChips(wager)} Chips`
-                      : `Deal Hand · Bet ${formatChips(wager)} Chips`}
+                      ? `${t('bj.confirmBet')} · ${formatChips(wager)}`
+                      : `${t('bj.dealHand')} ${formatChips(wager)}`}
                 </button>
                 {seats.length > 1 && (phase === 'lobby' || phase === 'settled') && (
                   <button
@@ -380,9 +399,8 @@ export function BlackjackTable({
                     className="btn btn--ghost btn--sm"
                     onClick={() => void onStartRound()}
                     disabled={actionBusy}
-                    title="Start a 15-second betting timer for all seated players"
                   >
-                    Open Table Betting (15s)
+                    {t('room.openTableBetting')}
                   </button>
                 )}
               </div>
@@ -398,7 +416,7 @@ export function BlackjackTable({
               onClick={() => void onAction('hit')}
               disabled={actionBusy}
             >
-              Hit (Draw Card)
+              {t('bj.hit')}
             </button>
             <button
               type="button"
@@ -406,27 +424,22 @@ export function BlackjackTable({
               onClick={() => void onAction('stand')}
               disabled={actionBusy}
             >
-              Stand (Hold {myHand.total})
+              {t('bj.stand')} ({myHand.total})
             </button>
             <button
               type="button"
               className="btn btn--gold bj-action-btn"
               onClick={() => void onAction('double')}
               disabled={actionBusy || !canDoubleDown}
-              title={
-                canDoubleDown
-                  ? `Double wager to ${formatChips(myHand.bet * 2)} and draw 1 final card`
-                  : 'Double Down requires exactly 2 cards and sufficient chip balance'
-              }
             >
-              Double Down (+{formatChips(myHand.bet)})
+              {t('bj.doubleDown')} (+{formatChips(myHand.bet)})
             </button>
           </div>
         )}
       </div>
 
       {/* 4. Seated Players Arc */}
-      <div className="seats-grid">
+      <div className="seats-grid seats-grid--arc">
         {seats.map((seat) => {
           const isTurn = gameState?.turn_user_id === seat.user_id;
           const isMe = currentUserId === seat.user_id;
@@ -451,7 +464,6 @@ export function BlackjackTable({
                 seat.status === 'afk' ? ' seat-card--afk' : ''
               }${incomingHit ? ' seat-card--hit' : ''}${outgoingCast ? ' seat-card--casting' : ''}`}
             >
-              {/* Quick-Emote Floating Speech Bubble */}
               {quickBubble && (
                 <div key={quickBubble.id} className="quick-emote-bubble" role="status">
                   <span className="quick-emote-bubble__sym">{quickBubble.symbol}</span>
@@ -459,7 +471,6 @@ export function BlackjackTable({
                 </div>
               )}
 
-              {/* Incoming Targeted Interactive Emote Overlay */}
               {incomingHit && (
                 <div key={incomingHit.id} className="seat-hit-overlay" role="status">
                   <EmoteVectorIcon animation={incomingHit.animation} size={48} />
@@ -470,15 +481,17 @@ export function BlackjackTable({
               )}
 
               <div className="seat-card__top">
-                <span className="muted small tabular">Seat #{seat.seat + 1}</span>
+                <span className="muted small tabular">
+                  {t('room.seat')} #{seat.seat + 1}
+                </span>
                 <div className="row">
-                  {room.host_id === seat.user_id && <span className="badge">Host</span>}
+                  {room.host_id === seat.user_id && <span className="badge">{t('room.host')}</span>}
                   {seat.status === 'afk' ? (
                     <span className="badge badge--timeout">AFK</span>
                   ) : seat.status === 'spectating' ? (
-                    <span className="badge">Spectating</span>
+                    <span className="badge">{t('room.spectating')}</span>
                   ) : isTurn ? (
-                    <span className="badge badge--open">Acting</span>
+                    <span className="badge badge--open">{t('room.acting')}</span>
                   ) : null}
                 </div>
               </div>
@@ -487,7 +500,7 @@ export function BlackjackTable({
                 <Avatar avatarId={seat.avatar_id} userId={seat.user_id} size={48} />
                 <div className="seat-card__meta">
                   <strong className="seat-card__name">
-                    {seat.username} {isMe ? '(You)' : ''}
+                    {seat.username} {isMe ? t('room.you') : ''}
                   </strong>
                   <span className="muted small">{cbItem ? cbItem.name : 'House Deck'}</span>
                 </div>
@@ -501,11 +514,12 @@ export function BlackjackTable({
                 />
               </div>
 
-              {/* Player's Blackjack Hand Cards & Wager */}
               {seatHand && seatHand.bet > 0 ? (
                 <div className="bj-seat-hand">
                   <div className="bj-seat-hand__meta">
-                    <span className="badge tabular">Bet: {formatChips(seatHand.bet)}</span>
+                    <span className="badge badge--open tabular">
+                      ● {formatChips(seatHand.bet)}
+                    </span>
                     {seatHand.cards.length > 0 && (
                       <span
                         className={`badge tabular ${
@@ -528,7 +542,7 @@ export function BlackjackTable({
                       <span className="badge">Stood</span>
                     )}
                     {seatHand.status === 'doubled' && phase === 'playing' && (
-                      <span className="badge badge--open">2× Doubled</span>
+                      <span className="badge badge--open">2×</span>
                     )}
                   </div>
 
@@ -539,8 +553,8 @@ export function BlackjackTable({
                           key={`${seat.user_id}-c-${idx}-${c.rank}-${c.suit}`}
                           card={c}
                           cardBackUrl={cardBackUrl}
-                          width={68}
-                          height={96}
+                          width={72}
+                          height={102}
                           className="bj-card-anim"
                         />
                       ))}
@@ -553,11 +567,11 @@ export function BlackjackTable({
                     </div>
                   )}
                 </div>
-              ) : seatHand?.status === 'betting' ? (
-                <p className="muted small bj-seat-waiting">Selecting wager…</p>
-              ) : seatHand?.status === 'skipped_afk' ? (
-                <p className="muted small bj-seat-waiting">Skipped (15s Timeout → AFK)</p>
-              ) : null}
+              ) : (
+                <div className="casino-betting-circle" aria-hidden="true">
+                  <span>{seatHand?.status === 'betting' ? 'BETTING…' : 'WAGER ZONE'}</span>
+                </div>
+              )}
 
               {isTurn && turnSeconds !== null && (
                 <div className="seat-turn-bar">
@@ -573,9 +587,8 @@ export function BlackjackTable({
                   type="button"
                   className="btn btn--ghost btn--sm seat-target-btn"
                   onClick={() => void onFireInteractive(seat.user_id)}
-                  title="Launch selected interactive emote at this player"
                 >
-                  🎯 Target with Emote
+                  {t('room.targetEmote')}
                 </button>
               )}
             </div>
@@ -585,4 +598,3 @@ export function BlackjackTable({
     </section>
   );
 }
-

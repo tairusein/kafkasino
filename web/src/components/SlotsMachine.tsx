@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSound } from '../audio/SoundProvider';
+import { useI18n } from '../i18n/I18nProvider';
 import { formatChips } from '../lib/format';
 import type { GameStateRow, Room, SlotHistoryEntry, SlotSymbol } from '../lib/types';
 import { useWallet } from '../wallet/WalletProvider';
@@ -158,6 +159,7 @@ interface SlotsMachineProps {
 export function SlotsMachine({ room, gameState, actionBusy, onSpin }: SlotsMachineProps) {
   const { balance } = useWallet();
   const { sound } = useSound();
+  const { t } = useI18n();
 
   const tableMinBet = Math.max(room.min_bet || 0, 50);
   const [wager, setWager] = useState<number>(tableMinBet);
@@ -268,13 +270,13 @@ export function SlotsMachine({ room, gameState, actionBusy, onSpin }: SlotsMachi
   }
 
   return (
-    <section className="table-felt slots-felt" aria-label="Vintage 3-reel slot machine">
+    <section className="table-felt casino-oval-felt slots-felt" aria-label="Vintage 3-reel slot machine">
       <div className="slots-layout">
         {/* Left: Vintage 3-Reel Mechanical Cabinet */}
         <div className="slots-cabinet">
           <header className="slots-cabinet__crest">
-            <span className="eyebrow">The Imperial Automat · Est. 1924</span>
-            <h2 className="slots-cabinet__title">Sovereign Three-Reel</h2>
+            <span className="eyebrow">{t('slots.eyebrow')}</span>
+            <h2 className="slots-cabinet__title">{t('slots.title')}</h2>
             <span className="badge tabular">RTP: 94.53% · House Edge: 5.47%</span>
           </header>
 
@@ -400,7 +402,7 @@ export function SlotsMachine({ room, gameState, actionBusy, onSpin }: SlotsMachi
                   }
                   data-silent
                 >
-                  {isAnyReelSpinning ? 'Spinning Reels…' : `Pull Handle · Spin (${formatChips(wager)})`}
+                  {isAnyReelSpinning ? t('slots.spinning') : `${t('slots.pullLever')} (${formatChips(wager)})`}
                 </button>
               </div>
             </div>
@@ -410,7 +412,7 @@ export function SlotsMachine({ room, gameState, actionBusy, onSpin }: SlotsMachi
         {/* Right: Brass Paytable & Mathematical RTP Breakdown */}
         <aside className="slots-paytable" aria-label="Slot machine paytable and RTP mathematics">
           <div className="slots-paytable__head">
-            <span className="eyebrow">Certified Paytable · 20³ = 8,000 Stops</span>
+            <span className="eyebrow">{t('slots.paytable')} · 20³ = 8,000 Stops</span>
             <h3>Payout Multipliers</h3>
           </div>
 
