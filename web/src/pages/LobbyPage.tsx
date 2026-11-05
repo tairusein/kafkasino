@@ -541,11 +541,7 @@ export function LobbyPage() {
                     </td>
                     <td className="tabular">{formatChips(r.min_bet)}</td>
                     <td>
-                      {r.status === 'playing'
-                        ? t('lobby.status.playing')
-                        : r.status === 'finished'
-                          ? t('lobby.status.finished')
-                          : t('lobby.status.waiting')}
+                      {r.status === 'playing' ? t('lobby.status.playing') : t('lobby.status.waiting')}
                     </td>
                     <td>
                       <button
