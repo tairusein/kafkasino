@@ -65,7 +65,7 @@ export function generateRecoveryPhrase(): string[] {
  * lowercases, trims, and collapses any whitespace/punctuation separators to single spaces.
  */
 export function normalizeRecoveryPhrase(input: string | readonly string[]): string {
-  const raw = Array.isArray(input) ? input.join(' ') : String(input);
+  const raw = typeof input === 'string' ? input : input.join(' ');
   return raw
     .trim()
     .toLowerCase()
