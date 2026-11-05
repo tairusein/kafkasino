@@ -39,16 +39,18 @@ insert into public.avatars (id, display_name, image_path, sort_order) values
   ('elephant', 'The Diplomat — Elephant',    'avatars/elephant.svg', 7),
   ('penguin',  'The Maître d'' — Penguin',   'avatars/penguin.svg',  8),
   ('eagle',    'The Captain — Eagle',        'avatars/eagle.svg',    9),
-  ('panther',  'The Gentleman — Panther',    'avatars/panther.svg', 10);
+  ('panther',  'The Gentleman — Panther',    'avatars/panther.svg', 10)
+on conflict (id) do nothing;
 
--- ---------- profiles (public-facing data only; NO balance here) --------------
+-- ---------- profiles (public-facing data + hashed recovery phrase; NO balance) --
 create table public.profiles (
-  id                 uuid primary key references auth.users(id) on delete cascade,
-  username           text not null,
-  avatar_id          text not null references public.avatars(id),
-  equipped_card_back uuid,                 -- FK to shop_items added in migration 3; NULL = default
-  created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now(),
+  id                   uuid primary key references auth.users(id) on delete cascade,
+  username             text not null,
+  avatar_id            text not null default 'fox' references public.avatars(id),
+  equipped_card_back   uuid,                 -- FK to shop_items added in migration 3; NULL = default
+  recovery_phrase_hash text,                 -- SHA-256 hex digest of the 12-word recovery phrase
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
   constraint profiles_username_format check (username ~ '^[A-Za-z0-9_]{3,20}$')
 );
 create unique index profiles_username_lower_key on public.profiles (lower(username));
@@ -177,39 +179,84 @@ language plpgsql security definer
 set search_path = ''
 as $$
 declare
-  v_username   text := nullif(trim(new.raw_user_meta_data ->> 'username'), '');
-  v_avatar     text := nullif(new.raw_user_meta_data ->> 'avatar_id', '');
-  -- Starting capital is, by definition, exactly 10x the daily bonus. Constant on purpose.
-  c_multiplier constant bigint := 10;
-  v_start      bigint;
+  v_meta          jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  v_username      text  := nullif(trim(v_meta ->> 'username'), '');
+  v_email_local   text;
+  v_avatar        text  := coalesce(
+    nullif(trim(v_meta ->> 'avatar_id'), ''),
+    nullif(trim(v_meta ->> 'avatar'), ''),
+    'fox'
+  );
+  v_recovery_hash text  := coalesce(
+    nullif(trim(v_meta ->> 'recovery_phrase_hash'), ''),
+    nullif(trim(v_meta ->> 'recovery_digest'), '')
+  );
+  c_multiplier    constant bigint := 10;
+  v_daily_bonus   bigint;
+  v_start         bigint;
 begin
+  -- 1. Resolve username from metadata, or derive from synthetic internal email, or fallback to player_<id>
+  if v_username is null and new.email is not null then
+    v_email_local := split_part(new.email, '@', 1);
+    v_email_local := regexp_replace(v_email_local, '^u\.|\.u$', '', 'g');
+    v_email_local := regexp_replace(v_email_local, '[^A-Za-z0-9_]', '', 'g');
+    if v_email_local ~ '^[A-Za-z0-9_]{3,20}$' then
+      v_username := v_email_local;
+    end if;
+  end if;
+
   if v_username is null then
     v_username := 'player_' || substr(replace(new.id::text, '-', ''), 1, 8);
   end if;
+
   if v_username !~ '^[A-Za-z0-9_]{3,20}$' then
     raise exception 'invalid_username';
   end if;
 
-  if v_avatar is null then
-    v_avatar := 'fox';
-  elsif not exists (select 1 from public.avatars where id = v_avatar) then
+  -- 2. Validate avatar against public.avatars (Ensure 'fox' exists so FK never fails)
+  insert into public.avatars (id, display_name, image_path, sort_order)
+  values ('fox', 'The Barrister — Fox', 'avatars/fox.jpg', 1)
+  on conflict (id) do nothing;
+
+  if not exists (select 1 from public.avatars where id = v_avatar) then
     raise exception 'invalid_avatar';
   end if;
 
-  insert into public.profiles (id, username, avatar_id) values (new.id, v_username, v_avatar);
-  insert into public.user_roles (user_id, role) values (new.id, 'player');
-  insert into public.wallets (user_id, balance) values (new.id, 0);
+  -- 3. Insert profile with raw username, avatar_id, and SHA-256 recovery_phrase_hash
+  insert into public.profiles (id, username, avatar_id, recovery_phrase_hash)
+  values (new.id, v_username, v_avatar, v_recovery_hash)
+  on conflict (id) do update
+    set username             = excluded.username,
+        avatar_id            = excluded.avatar_id,
+        recovery_phrase_hash = coalesce(excluded.recovery_phrase_hash, public.profiles.recovery_phrase_hash),
+        updated_at           = now();
 
-  v_start := c_multiplier * public.cfg_int('daily_bonus_amount');
+  -- 4. Provision player role and wallet
+  insert into public.user_roles (user_id, role)
+  values (new.id, 'player')
+  on conflict (user_id, role) do nothing;
+
+  insert into public.wallets (user_id, balance)
+  values (new.id, 0)
+  on conflict (user_id) do nothing;
+
+  -- 5. Grant 10x starting capital
+  v_daily_bonus := coalesce(public.cfg_int('daily_bonus_amount'), 1000);
+  if v_daily_bonus <= 0 then
+    v_daily_bonus := 1000;
+  end if;
+  v_start := c_multiplier * v_daily_bonus;
+
   perform public.apply_balance_delta(
     new.id, v_start, 'starting_bonus', 'user', new.id::text,
     'starting_bonus:' || new.id::text,
-    jsonb_build_object('multiplier', c_multiplier, 'daily_bonus', public.cfg_int('daily_bonus_amount'))
+    jsonb_build_object('multiplier', c_multiplier, 'daily_bonus', v_daily_bonus)
   );
   return new;
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -346,4 +393,3 @@ begin
   );
 end;
 $$;
-

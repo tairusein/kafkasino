@@ -3,7 +3,8 @@
 -- =============================================================================
 -- Supabase auto-grants broad privileges on new public objects to anon/authenticated.
 -- We strip ALL of them, then re-grant the minimum. RLS stays the second line of defence.
--- service_role (trusted Edge Functions) is intentionally left untouched.
+-- service_role, postgres, and supabase_auth_admin (used by GoTrue triggers on auth.users)
+-- retain full backend execution/table privileges.
 --
 -- !! Every future migration that adds a table or function MUST add its own grants.
 --    The default-privilege revokes below make new objects private by default.
@@ -15,6 +16,12 @@ alter default privileges in schema public revoke execute on functions from publi
 revoke all on all tables    in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
 revoke execute on all functions in schema public from public, anon, authenticated;
+
+-- ---------- Backend & GoTrue Auth Trigger Roles (MUST keep full access) -------------
+grant usage on schema public to postgres, anon, authenticated, service_role, supabase_auth_admin;
+grant all on all tables    in schema public to postgres, service_role, supabase_auth_admin;
+grant all on all sequences in schema public to postgres, service_role, supabase_auth_admin;
+grant execute on all functions in schema public to postgres, service_role, supabase_auth_admin;
 
 -- ---------- Tables: SELECT only (rows further filtered by RLS) ---------------------
 grant select on public.avatars, public.app_config, public.game_catalog, public.tournaments
@@ -69,11 +76,11 @@ grant execute on function
   public.admin_set_featured_tournament(uuid)
   to authenticated;
 
--- ---------- Functions: server-only (service_role / postgres) ------------------------
+-- ---------- Functions: server-only (service_role / postgres / supabase_auth_admin) --
 grant execute on function
   public.apply_balance_delta(uuid, bigint, text, text, text, text, jsonb),
   public.consume_emote_charge(uuid, uuid),
   public.force_afk(uuid, uuid),
-  public.bootstrap_admin(text)
-  to service_role;
-
+  public.bootstrap_admin(text),
+  public.handle_new_user()
+  to postgres, service_role, supabase_auth_admin;

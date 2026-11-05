@@ -82,6 +82,17 @@ export function RegisterPage() {
 
     const trimmedUsername = username.trim();
 
+    // Pre-check username availability via RPC so taken usernames are reported cleanly
+    const { data: available } = await supabase.rpc('is_username_available', {
+      p_username: trimmedUsername,
+    });
+    if (available === false) {
+      setUsernameState('taken');
+      setError('That username is already taken. Please choose another.');
+      setBusy(false);
+      return;
+    }
+
     // 1. Generate 12-word recovery phrase using window.crypto.getRandomValues and hash with SHA-256
     const words = generateRecoveryPhrase();
     const recoveryDigest = await hashRecoveryPhraseClient(words);
@@ -90,10 +101,11 @@ export function RegisterPage() {
     //    does not redirect away before the user downloads or copies their phrase.
     setPendingRecoveryAck(true);
 
+    // Pass `recovery_phrase_hash` (not `recovery_digest`) so even if the remote DB still has an
+    // older trigger version, it never enters the legacy `crypt()` branch during user creation.
     const { data, error: err } = await signUpWithUsername(trimmedUsername, password, {
       username: trimmedUsername,
       avatar_id: avatarId,
-      recovery_digest: recoveryDigest,
       recovery_phrase_hash: recoveryDigest,
     });
 
@@ -111,6 +123,11 @@ export function RegisterPage() {
     if (!data.session) {
       await signInWithUsername(trimmedUsername, password);
     }
+
+    // Also persist the recovery phrase hash via RPC if available
+    void supabase.rpc('save_recovery_phrase_hash', {
+      p_recovery_hash: recoveryDigest,
+    });
 
     setRecoveryWords(words);
     setHasSavedPhrase(false);

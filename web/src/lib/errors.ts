@@ -3,6 +3,7 @@
 const SERVER_CODES: Record<string, string> = {
   not_authenticated: 'Your session has expired. Please sign in again.',
   invalid_username: 'Usernames must be 3–20 characters: letters, numbers or underscores.',
+  username_taken: 'That username is already taken. Please choose another.',
   invalid_avatar: 'Please choose one of the avatars.',
   invalid_recovery_phrase: 'Recovery phrase or username did not match our records.',
   too_many_recovery_attempts:
@@ -65,7 +66,7 @@ export function friendlyError(err: unknown): string {
   if (SERVER_CODES[msg]) return SERVER_CODES[msg];
 
   if (/invalid login credentials/i.test(msg)) return 'Incorrect username or password.';
-  if (/user already registered|already been registered/i.test(msg)) {
+  if (/user already registered|already been registered|profiles_username_lower_key|username_taken/i.test(msg)) {
     return 'That username is already taken. Please choose another.';
   }
   if (/email not confirmed/i.test(msg)) {
@@ -74,9 +75,8 @@ export function friendlyError(err: unknown): string {
   if (/invalid.*email|email.*invalid|unable to validate/i.test(msg)) {
     return 'Enter a valid username (3–20 letters, numbers or underscores).';
   }
-  // The signup trigger raises on a taken/invalid username; GoTrue wraps it generically.
-  if (/database error saving new user/i.test(msg) || /profiles_username_lower_key/i.test(msg)) {
-    return 'That username is already taken. Please choose another.';
+  if (/database error saving new user/i.test(msg)) {
+    return 'Could not complete registration. Please try a different username or run Migration 14 in Supabase SQL Editor.';
   }
   if (/tournaments_featured_not_draft/i.test(msg)) {
     return 'The featured homepage banner tournament cannot be in Draft status.';
