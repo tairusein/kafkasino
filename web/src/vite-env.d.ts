@@ -57,7 +57,7 @@ declare namespace JSX {
     textarea: IntrinsicElementAttributes<HTMLTextAreaElement>;
     form: IntrinsicElementAttributes<HTMLFormElement>;
     button: IntrinsicElementAttributes<HTMLButtonElement>;
-    [elemName: string]: IntrinsicElementAttributes< any>;
+    [elemName: string]: IntrinsicElementAttributes<any>;
   }
 }
 
@@ -274,16 +274,25 @@ declare module 'react-router-dom' {
     state?: unknown;
     replace?: boolean;
     className?: string;
+    style?: Record<string, string | number | undefined>;
     title?: string;
     'aria-label'?: string;
     children?: any;
     onClick?: (e: any) => void;
+    [attr: string]: any;
   }): any;
   export function NavLink(props: {
     to: string;
     end?: boolean;
     className?: string | ((props: { isActive: boolean; isPending: boolean }) => string);
+    style?:
+      | Record<string, string | number | undefined>
+      | ((props: { isActive: boolean; isPending: boolean }) => Record<string, string | number | undefined> | undefined);
+    title?: string;
+    'aria-label'?: string;
     children?: any;
+    onClick?: (e: any) => void;
+    [attr: string]: any;
   }): any;
   export function Navigate(props: { to: string; replace?: boolean; state?: unknown }): any;
   export function Outlet(props?: { context?: unknown }): any;
