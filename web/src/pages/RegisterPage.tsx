@@ -81,7 +81,7 @@ export function RegisterPage() {
     const trimmedUsername = username.trim();
     const internalEmail = usernameToInternalEmail(trimmedUsername);
 
-    // 1. Generate 12-word recovery phrase and pre-hash it before leaving the browser
+    // 1. Generate 12-word recovery phrase and pre-hash it with SHA-256 before leaving the browser
     const words = generateRecoveryPhrase();
     const recoveryDigest = await hashRecoveryPhraseClient(words);
 
@@ -154,10 +154,12 @@ export function RegisterPage() {
     setHasSavedPhrase(true);
   }
 
-  function onProceedToApp() {
+  function onContinueToLobby() {
     if (!hasSavedPhrase) return;
     setPendingRecoveryAck(false);
-    if (!session) {
+    if (session) {
+      navigate('/lobby', { replace: true });
+    } else {
       navigate('/login', { replace: true, state: location.state });
     }
   }
@@ -165,7 +167,7 @@ export function RegisterPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Choose an identity. No email required — you start with 10,000 chips."
+      subtitle="Choose an identity. You start with a generous stack."
     >
       <form className="form" onSubmit={onSubmit}>
         <label className="field">
@@ -176,7 +178,6 @@ export function RegisterPage() {
             required
             minLength={3}
             maxLength={20}
-            placeholder="e.g. GrandDuke"
             value={username}
             onChange={(e) => {
               setUsername(e.target.value);
@@ -257,7 +258,7 @@ export function RegisterPage() {
         </Link>
       </p>
 
-      {/* Mandatory Recovery Phrase Modal Blocker */}
+      {/* Mandatory 12-Word Recovery Phrase Modal Blocker */}
       {recoveryWords && (
         <div
           className="recovery-modal-backdrop"
@@ -270,9 +271,9 @@ export function RegisterPage() {
               <span className="eyebrow">Mandatory Security Backup</span>
               <h2 id="recovery-modal-title">Save Your 12-Word Recovery Phrase</h2>
               <p className="muted small">
-                Kafkasino does not collect your email. This 12-word Recovery Phrase is the{' '}
-                <strong>only way</strong> to reset your password if you ever forget it. We store
-                only an irreversible cryptographic hash — we can never show it to you again.
+                Kafkasino does not use email addresses. This 12-word Recovery Phrase is the{' '}
+                <strong>only way</strong> to reset your password if you ever forget it. Save it now
+                before entering the lobby.
               </p>
             </div>
 
@@ -291,26 +292,26 @@ export function RegisterPage() {
                 className="btn btn--gold"
                 onClick={onDownloadTxt}
               >
-                {downloadedNotice ? '✓ Downloaded .txt Kit' : '⬇ Download .txt'}
+                {downloadedNotice ? '✓ Downloaded .txt' : 'Download .txt'}
               </button>
               <button
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => void onCopyPhrase()}
               >
-                {copiedNotice ? '✓ Copied to Clipboard' : '📋 Copy to clipboard'}
+                {copiedNotice ? '✓ Copied Phrase' : 'Copy Phrase'}
               </button>
             </div>
 
             <div className="recovery-modal__footer">
               {!hasSavedPhrase ? (
                 <p className="recovery-modal__warning">
-                  Please click <strong>Download .txt</strong> or <strong>Copy to clipboard</strong>{' '}
-                  above to unlock access to the salon.
+                  Click <strong>Download .txt</strong> or <strong>Copy Phrase</strong> above to
+                  unlock the <strong>Continue to Lobby</strong> button.
                 </p>
               ) : (
                 <p className="form-ok" style={{ margin: 0 }}>
-                  Recovery Phrase saved. You may now enter Kafkasino.
+                  Recovery Phrase saved. You may now continue to the lobby.
                 </p>
               )}
 
@@ -318,9 +319,9 @@ export function RegisterPage() {
                 type="button"
                 className="btn btn--gold btn--block"
                 disabled={!hasSavedPhrase}
-                onClick={onProceedToApp}
+                onClick={onContinueToLobby}
               >
-                Enter Kafkasino Salon →
+                Continue to Lobby
               </button>
             </div>
           </div>
